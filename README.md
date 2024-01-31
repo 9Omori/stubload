@@ -18,7 +18,7 @@ One-line install:
 
 If you get: `bash: stubload: Permission denied`, then make the script executable:
 
-`# chmod + /usr/local/bin/stubload`
+`# chmod +x /usr/local/bin/stubload`
 
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
