@@ -5,11 +5,11 @@ stubload is a bash script that utilises the Linux kernel's 'EFIStub'
 
 The goal of this script is to:
 
-(a) Remove the need for bootloaders
+* Remove the need for bootloaders
 
-(b) Speed up boot times by directly loading the kernel
+* Speed up boot times by directly loading the kernel
 
-(c) Make the experience of using EFIStub less of a hassle
+* Make the experience of using EFIStub less of a hassle
 
 ## Installation
 One-line install:
