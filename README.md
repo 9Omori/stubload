@@ -22,7 +22,7 @@ Create entries & remove previous entries:
 
 List entries:
 
-`# stubload -l`
+`$ stubload -l`
 
 ## Installation
 One-line install:
