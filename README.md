@@ -11,6 +11,19 @@ The goal of this script is to:
 
 * Make the experience of using EFIStub less of a hassle
 
+## Example usage
+Create entries:
+
+`# stubload -c`
+
+Create entries & remove previous entries:
+
+`# stubload -cr`
+
+List entries:
+
+`# stubload -l`
+
 ## Installation
 One-line install:
 
