@@ -18,6 +18,7 @@ function help
     echo "  -c   Creates the boot entry(s)"
     echo "  -r   Removes boot entry(s)"
     echo ""
+    exit 0
 }
 
 function rootCheck
@@ -149,6 +150,7 @@ function listEntry
         entry_${x}; let x++
         efibootmgr | grep -q " ${Label}" && echo "$(($x-1))* ${Label}"
     done
+    exit 0
 }
 
 ARGV=( $(echo $@ | sed 's/-//g; s/./& /g') )
@@ -173,8 +175,7 @@ function parseArg
 
 function main
 {
-    config; parseArg
-    test "${FirstAction}" == "help" -o "${FirstAction}" == "listEntry" || rootCheck
+    config; parseArg; rootCheck
     test -d "/etc/efistub" || mkdir /etc/efistub
     test "${Verbose}" && OutputFile="/dev/stdout" || OutputFile="/dev/null"
     test "${FirstAction}" && ${FirstAction}
