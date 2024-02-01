@@ -27,11 +27,7 @@ List entries:
 ## Installation
 One-line install:
 
-`# curl -L https://raw.githubusercontent.com/9Omori/stubload/master/stubload.sh -o /usr/local/bin/stubload`
-
-If you get: `bash: stubload: Permission denied`, then make the script executable:
-
-`# chmod +x /usr/local/bin/stubload`
+`$ curl https://raw.githubusercontent.com/9Omori/stubload/master/install.sh | sudo bash`
 
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses

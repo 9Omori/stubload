@@ -31,55 +31,10 @@ function rootCheck
     unset -f passRoot
 }
 
-ConfigFile="/etc/efistub/stubload.conf"
-
-ConfigTemplate='
-#
-# stubload.conf
-#
-
-BootDir=\"/boot\"
-
-entry_1 ()
-{
-  Label=\"Arch Linux\" 
-  Target=\"vmlinuz-linux\"
-  Ramdisk=\"initramfs-linux.img\"
-  Cmdline=\"cmdline\"
-}
-
-entry_2 ()
-{
-  Label=\"Arch Linux (fallback)\"
-  Target=\"vmlinuz-linux\"
-  Ramdisk=\"initramfs-linux-fallback.img\"
-  Cmdline=\"cmdline-fallback\"
-}
-'
-
 function config
 {
-    function create
-    {
-        echo "${ConfigTemplate}" >${ConfigFile}
-
-        if ! test -f "${ConfigFile}"; then
-            abort "${ConfigFile}: Failed to create configuration file."
-        else
-            echo "Created configuration file successfully. Please edit it."
-            exit 0
-        fi
-    }
-    . "${ConfigFile}" &>/dev/null || create
-
-    unset -f create
-}
-
-function repeatedEntry
-{
-    if efibootmgr | grep -q " ${Label}"; then
-        echo "WARNING: ${Label}: Entry is repeated. Use '-rR' to remove all entries with the same name."
-    fi
+    ConfigFile="/etc/efistub/stubload.conf"
+    . "${ConfigFile}" &>/dev/null || abort "${ConfigFile}: Configuration file does not exist."
 }
 
 function createEntry
@@ -92,7 +47,9 @@ function createEntry
             abort "Required fields are missing. Please edit ${ConfigFile} and fill in these fields."
         fi
 
-        Label="$Label" repeatedEntry
+        if efibootmgr | grep -q " ${Label}"; then
+            echo "WARNING: ${Label}: Entry is repeated. Use '-rR' to remove all entries with the same name."
+        fi
 
         local Part="$(cat /proc/mounts | grep " ${BootDir} " | awk '{print $1}')"
         local Disk="${Part//p*}"
