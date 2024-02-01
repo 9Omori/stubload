@@ -127,9 +127,10 @@ ARGN="$(echo $@ | wc -w)"
 
 function parseArg
 {
-    test "${ARGN}" == '0' && FirstAction="help"
+    SanityCheck=false
+    
+    test "${ARGN}" == '0' && FirstAction="help" || SanityCheck=true
 
-    SanityCheck=true
     for ARG in ${ARGV[@]}; do
         case "$ARG" in
             "h") FirstAction="help"; SanityCheck=false ;;
