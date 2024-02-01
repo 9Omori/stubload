@@ -6,6 +6,11 @@ function abort
     exit 1
 }
 
+function bool
+{
+    test "$1" == "true" -o "$1" == '1'
+}
+
 function help
 {
     echo "Usage: ${0##*/} [Argument]"
@@ -18,7 +23,6 @@ function help
     echo "  -c   Creates the boot entry(s)"
     echo "  -r   Removes boot entry(s)"
     echo ""
-    exit 0
 }
 
 function sanityCheck
@@ -30,12 +34,13 @@ function sanityCheck
     function depCheck
     {
         Dependencies=( "efibootmgr" )
-        for x in ${Dependencies[*]}; do
+        for x in ${Dependencies[@]}; do
             command -v "$x" &>/dev/null || return 1
         done
     }
     rootCheck || abort "This script must be ran as root."
     depCheck || abort "$x: Required dependency is missing."
+    test -d "/etc/efistub" || mkdir /etc/efistub
     unset -f passRoot
 }
 
@@ -47,7 +52,7 @@ function config
 
 function createEntry
 {
-    pushd /etc/efistub &>/dev/null
+    cd /etc/efistub
     let x=1
     until ! command -v entry_${x} &>/dev/null; do
         entry_${x}; let x++
@@ -68,12 +73,11 @@ function createEntry
 
         if test "$?" == '0'; then
             echo "${Label}: Added boot entry successfully."
-             unset Part Disk PartNum Unicode Ramdisk Cmdline Target Label
+            unset Part Disk PartNum Unicode Ramdisk Cmdline Target Label
         else
             abort "${Label}: Failed to add boot entry."
         fi
     done
-    popd /etc/efistub &>/dev/null
 }
 
 function removeEntry
@@ -94,7 +98,7 @@ function removeEntry
 
         entryExists && efibootmgr -B -b "$(getTarget)" | grep " ${Label}" &>${OutputFile}
 
-        if entryExists && test "$Repeat"; then
+        if entryExists && bool "$Repeat"; then
             while entryExists; do
                 efibootmgr -B -b "$(getTarget)" | grep " ${Label}" &>${OutputFile}
             done
@@ -112,10 +116,10 @@ function listEntry
 
     let x=1
     until ! command -v entry_${x} &>/dev/null; do
-        entry_${x}; let x++
-        efibootmgr | grep -q " ${Label}" && echo "$(($x-1))* ${Label}"
+        entry_${x}
+        efibootmgr | grep -q " ${Label}" && echo "(${x}) ${Label}"
+        let x++
     done
-    exit 0
 }
 
 ARGV=( $(echo $@ | sed 's/-//g; s/./& /g') )
@@ -123,14 +127,15 @@ ARGN="$(echo $@ | wc -w)"
 
 function parseArg
 {
-    test "${ARGN}" == '0' && help
+    test "${ARGN}" == '0' && FirstAction="help"
 
-    for ARG in ${ARGV[*]}; do
+    SanityCheck=true
+    for ARG in ${ARGV[@]}; do
         case "$ARG" in
-            "h") FirstAction="help" ;;
-            "v") export Verbose=1 ;;
-            "R") export Repeat=1 ;;
-            "l") FirstAction="listEntry" ;;
+            "h") FirstAction="help"; SanityCheck=false ;;
+            "v") Verbose=true ;;
+            "R") Repeat=true ;;
+            "l") FirstAction="listEntry"; SanityCheck=false ;;
             "c") SecondAction="createEntry" ;;
             "r") FirstAction="removeEntry" ;;
             *) abort "${ARG}: Unrecognised argument" ;;
@@ -140,9 +145,9 @@ function parseArg
 
 function main
 {
-    config; parseArg; sanityCheck
-    test -d "/etc/efistub" || mkdir /etc/efistub
-    test "${Verbose}" && OutputFile="/dev/stdout" || OutputFile="/dev/null"
+    config; parseArg
+    bool "${SanityCheck}" && sanityCheck
+    bool "${Verbose}" && OutputFile="/dev/stdout" || OutputFile="/dev/null"
     test "${FirstAction}" && ${FirstAction}
     test "${SecondAction}" && ${SecondAction}
     exit 0
