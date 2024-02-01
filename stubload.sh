@@ -58,9 +58,9 @@ function createEntry
 
         efibootmgr -c -d "${Disk}" -p "${PartNum}" -L "${Label}" -l "${Target}" -u "${Unicode}" | grep " ${Label}" &>${OutputFile}
 
-        unset Part Disk PartNum Unicode Ramdisk Cmdline Target
         if test "$?" == '0'; then
             echo "${Label}: Added boot entry successfully."
+             unset Part Disk PartNum Unicode Ramdisk Cmdline Target Label
         else
             abort "${Label}: Failed to add boot entry."
         fi
