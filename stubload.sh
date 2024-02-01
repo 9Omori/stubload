@@ -42,7 +42,7 @@ function sanityCheck
 function config
 {
     ConfigFile="/etc/efistub/stubload.conf"
-    . "${ConfigFile}" &>/dev/null || abort "${ConfigFile}: Configuration file does not exist."
+    . "${ConfigFile}" &>/dev/null || abort "${ConfigFile}: Could not source configuration file."
 }
 
 function createEntry
