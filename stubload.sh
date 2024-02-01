@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+ConfigFile="/etc/efistub/stubload.conf"
+ConfigDir="$(dirname $ConfigFile)"
+
 function abort
 {
     echo -e "ERROR: $@"
@@ -45,19 +48,18 @@ function sanityCheck
     rootCheck || abort "This script must be ran as root."
     depCheck || abort "$x: Required dependency is missing."
     uefiCheck || abort "/sys/firmware/efi: No such directory. stubload is only compatible with UEFI-based systems."
-    test -d "/etc/efistub" || mkdir /etc/efistub
+    test -d "${ConfigDIr}" || mkdir "${ConfigDir}"
     unset -f passRoot
 }
 
 function config
 {
-    ConfigFile="/etc/efistub/stubload.conf"
     . "${ConfigFile}" &>/dev/null || abort "${ConfigFile}: Could not source configuration file."
 }
 
 function createEntry
 {
-    cd /etc/efistub
+    cd $ConfigDir
     let x=1
     until ! command -v entry_${x} &>/dev/null; do
         entry_${x}; let x++
