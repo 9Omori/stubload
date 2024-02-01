@@ -27,7 +27,7 @@ List entries:
 ## Installation
 One-line install:
 
-`$ curl https://raw.githubusercontent.com/9Omori/stubload/master/install.sh | sudo bash`
+`$ curl https://raw.githubusercontent.com/9Omori/stubload/main/install.sh | sudo bash`
 
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
