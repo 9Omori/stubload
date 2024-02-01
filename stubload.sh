@@ -21,13 +21,21 @@ function help
     exit 0
 }
 
-function rootCheck
+function sanityCheck
 {
-    function passRoot
+    function rootCheck
     {
         test "$(id -u)" == '0' -o "${USER}" == "root"
     }
-    passRoot || abort "This script must be ran as root."
+    function depCheck
+    {
+        Dependencies=( "efibootmgr" )
+        for x in ${Dependencies[*]}; do
+            command -v "$x" &>/dev/null || return 1
+        done
+    }
+    rootCheck || abort "This script must be ran as root."
+    depCheck || abort "$x: Required dependency is missing."
     unset -f passRoot
 }
 
@@ -132,7 +140,7 @@ function parseArg
 
 function main
 {
-    config; parseArg; rootCheck
+    config; parseArg; sanityCheck
     test -d "/etc/efistub" || mkdir /etc/efistub
     test "${Verbose}" && OutputFile="/dev/stdout" || OutputFile="/dev/null"
     test "${FirstAction}" && ${FirstAction}
