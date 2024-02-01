@@ -17,7 +17,6 @@ function download
 function main
 {
     Source="https://raw.githubusercontent.com/9Omori/stubload/master"
-    rootCheck
     download ${Source}/stubload.sh /usr/local/bin/stubload
     download ${Source}/stubload.conf /etc/efistub/stubload.conf
     chmod +x /usr/local/bin/stubload
