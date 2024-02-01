@@ -38,8 +38,13 @@ function sanityCheck
             command -v "$x" &>/dev/null || return 1
         done
     }
+    function uefiCheck
+    {
+        test -d "/sys/firmware/efi"
+    }
     rootCheck || abort "This script must be ran as root."
     depCheck || abort "$x: Required dependency is missing."
+    uefiCheck || abort "/sys/firmware/efi: No such directory. stubload is only compatible with UEFI-based systems."
     test -d "/etc/efistub" || mkdir /etc/efistub
     unset -f passRoot
 }
