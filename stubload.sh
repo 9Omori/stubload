@@ -40,7 +40,7 @@ function sanityCheck
     }
     function uefiCheck
     {
-        test -d "/sys/firmware/efi"
+        efibootmgr &>/dev/null && test -d "/sys/firmware/efi"
     }
     rootCheck || abort "The selected action must be ran as root."
     depCheck || abort "efibootmgr is missing."
