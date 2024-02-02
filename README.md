@@ -1,15 +1,15 @@
 # stubload
 
-## What is it?
-stubload is a bash script that utilises the Linux kernel's 'EFIStub'
+## What?
+`stubload` is a bash script that interfaces with `efibootmgr` to create a boot entry for the Linux kernel
 
-The goal of this script is to:
+## Why?
 
-* Remove the need for bootloaders
+The main goals of `stubload` are:
 
-* Speed up boot times by directly loading the kernel
+* Speed up boot times & remove the need for a bootloader
 
-* Make the experience of using EFIStub less of a hassle
+* Make using EFIStub easier
 
 ## Example usage
 Create entries:
@@ -18,11 +18,17 @@ Create entries:
 
 Create entries & remove previous entries:
 
-`# stubload -cr`
+`# stubload -crR`
 
 List entries:
 
 `$ stubload -l`
+
+## Prerequisites
+
+* A device with UEFI, not BIOS
+* `/boot` partition with the FAT filesystem, not EXT4
+* The kernel must have EFIStub supported
 
 ## Installation
 One-line install:
