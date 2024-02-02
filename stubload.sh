@@ -36,19 +36,16 @@ function sanityCheck
     }
     function depCheck
     {
-        Dependencies=( "efibootmgr" )
-        for x in ${Dependencies[@]}; do
-            command -v "$x" &>/dev/null || return 1
-        done
+        command -v "efibootmgr" &>/dev/null
     }
     function uefiCheck
     {
         test -d "/sys/firmware/efi"
     }
-    rootCheck || abort "This script must be ran as root."
-    depCheck || abort "$x: Required dependency is missing."
-    uefiCheck || abort "/sys/firmware/efi: No such directory. stubload is only compatible with UEFI-based systems."
-    test -d "${ConfigDIr}" || mkdir "${ConfigDir}"
+    rootCheck || abort "The selected action must be ran as root."
+    depCheck || abort "efibootmgr is missing."
+    uefiCheck || abort "EFI variables not found, stubload is only compatible with UEFI-based systems."
+    test -d "${ConfigDIr}" || mkdir -v "${ConfigDir}"
     unset -f passRoot
 }
 
@@ -68,7 +65,8 @@ function createEntry
         fi
 
         if efibootmgr | grep -q " ${Label}"; then
-            echo "WARNING: ${Label}: Entry is repeated. Use '-rR' to remove all entries with the same name."
+            echo "WARNING: ${Label}: Entry is listed more than once. This may cause issues."
+            echo "Use '-crR' to remove entries with the same name."
         fi
 
         local Part="$(cat /proc/mounts | grep " ${BootDir} " | awk '{print $1}')"
@@ -78,9 +76,10 @@ function createEntry
 
         efibootmgr -c -d "${Disk}" -p "${PartNum}" -L "${Label}" -l "${Target}" -u "${Unicode}" | grep " ${Label}" &>${OutputFile}
 
-        if test "$?" == '0'; then
+        unset Part Disk PartNum Unicode Ramdisk Cmdline Target Label -f entryExists
+
+        if efibootmgr | grep -q " ${Label}"; then
             echo "${Label}: Added boot entry successfully."
-            unset Part Disk PartNum Unicode Ramdisk Cmdline Target Label
         else
             abort "${Label}: Failed to add boot entry."
         fi
@@ -110,11 +109,9 @@ function removeEntry
                 efibootmgr -B -b "$(getTarget)" | grep " ${Label}" &>${OutputFile}
             done
         fi
-
+        unset -f getTarget entryExists
         entryExists && abort "${Label}: Failed to remove boot entry." || echo "${Label}: Removed boot entry."
     done
-
-    unset -f getTarget entryExists
 }
 
 function listEntry
@@ -134,21 +131,27 @@ ARGN="$(echo $@ | wc -w)"
 
 function parseArg
 {
-    SanityCheck=false
-    
-    test "${ARGN}" == '0' && FirstAction="help" || SanityCheck=true
+    test "${ARGN}" == '0' && FirstAction="help"
 
     for ARG in ${ARGV[@]}; do
         case "$ARG" in
-            "h") FirstAction="help"; SanityCheck=false ;;
+            "h") FirstAction="help" ;;
             "v") Verbose=true ;;
             "R") Repeat=true ;;
-            "l") FirstAction="listEntry"; SanityCheck=false ;;
+            "l") FirstAction="listEntry" ;;
             "c") SecondAction="createEntry" ;;
             "r") FirstAction="removeEntry" ;;
             *) abort "${ARG}: Unrecognised argument" ;;
         esac
     done
+
+    if test "$FirstAction" == "removeEntry"; then
+        SanityCheck=true
+    elif test "$FirstAction" -a ! "$SecondAction"; then
+        SanityCheck=false
+    elif test "$SecondAction"; then
+        SanityCheck=true
+    fi
 }
 
 function main
