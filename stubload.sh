@@ -64,6 +64,7 @@ function config
 
 function parse_config
 {
+    function dir { BootDir="$@" ;}
     function label { Label="$@" ;}
     function target { Target="$@" ;}
     function cmdline { [ "$@" ] && Unicode="$(cat $ConfigDir/$@)" ;}
