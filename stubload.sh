@@ -151,15 +151,30 @@ function list_entry
     } done
 }
 
+function version
+{
+    function version_check
+    {
+        curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/stubload.sha512sum -o /tmp/$0-version.sha512sum
+        if cmp -s <(sha512sum $0) /tmp/$0-version.sha512sum; then {
+            UpdateAvailable=true
+        } fi
+    }
+    version_check
+    echo "stubload version 0.1"
+    ( bool "$UpdateAvailable" ) && echo "An update is available." || echo "No updates are available."
+}
+
 function parse_arg
 {
     test "$ARGN" = '0' && FirstAction="help"
 
     for ARG in $ARGV; do {
         case "$ARG" in
-            "h") FirstAction="help" ;;
-            "v") Verbose=true ;;
+            "V") Verbose=true ;;
             "R") Repeat=true ;;
+            "h") FirstAction="help" ;;
+            "v") FirstAction="version" ;;
             "l") FirstAction="list_entry" ;;
             "c") SecondAction="create_entry" ;;
             "r") FirstAction="remove_entry" ;;
