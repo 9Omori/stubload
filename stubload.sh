@@ -59,7 +59,8 @@ function sanity_check
 function config
 {
     # '.' == POSIX compatible equivilent to bash's 'source'
-    . "$ConfigFile" &>/dev/null || abort "$ConfigFile: Could not source configuration file."
+    parse_config
+    . "$ConfigFile" || abort "$ConfigFile: Failed to parse configuration file."
 }
 
 function parse_config
@@ -67,44 +68,39 @@ function parse_config
     function dir { BootDir="$@" ;}
     function label { Label="$@" ;}
     function target { Target="$@" ;}
-    function cmdline { [ "$@" ] && Unicode="$(cat $ConfigDir/$@)" ;}
+    function cmdline { Unicode="$@" ;}
     function ramdisk { [ -f "$@" ] && Unicode+=" initrd=$@ " ;} 
-    
-    # '//p*' == Remove 'p' & everything after 'p'
-    # '//*p' == Remove 'p' & everything before 'p'
-    Part="$(cat /proc/mounts | grep " $BootDir " | awk '{print $1}')"
-    Disk="${Part//p*}"
-    PartNum="${Part//*p}"
 }
 
 function create_entry
 {
+    sanity_check
+    config
     cd $ConfigDir
-    let x=1
-    while ( command -v entry_$x &>/dev/null ); do
-    {
-        let x++
-        if ! ( test "$BootDir" -a "$BootDir" -a "$Target" -a "$Label" ); then
-        {
-            abort "Required fields are missing. Fix $ConfigFile to continue."
-        } fi
 
-        if ( efibootmgr | grep -q " $Label" ); then
-        {
+    let x=1
+    until ! ( command -v entry_$x &>/dev/null ); do {
+        entry_$x
+        let x++
+
+        if ( efibootmgr | grep -q " $Label" ); then {
             warn "$Label: Entry is listed more than once. This may cause issues."
             echo "Use '-crR' to remove entries with the same name."
         } fi
 
-        parse_config; entry_$x
-        efibootmgr -c -d "$Disk" -p "$PartNum" -L "$Label" -l "$Target" -u "$Unicode" | grep " $Label" &>$LogFile
+        # '//p*' == Remove 'p' & everything after 'p'
+        # '//*p' == Remove 'p' & everything before 'p'
+        Part="$(cat /proc/mounts | grep " $BootDir " | awk '{print $1}')"
+        Disk="${Part//p*}"
+        PartNum="${Part//*p}"
 
-        unset "Part" "Disk" "PartNum" "Unicode" "Ramdisk" "Cmdline" "Target" -f entryExists
+        efibootmgr -c -d "$Disk" -p "$PartNum" -L "$Label" -l "$Target" -u "$Unicode" | grep "$Label" &>$LogFile
 
-        if ( efibootmgr | grep -q " $Label" ); then
-        {
+        unset "Part" "Disk" "PartNum" "Unicode" "Ramdisk" "Cmdline" "Target" -f "entryExists"
+
+        if ( efibootmgr | grep -q " $Label" ); then {
             echo "$Label: Added boot entry successfully."
-        } else
-        {
+        } else {
             abort "$Label: Failed to add boot entry."
         } fi
     } done
@@ -112,6 +108,9 @@ function create_entry
 
 function remove_entry
 {
+    sanity_check
+    config
+
     function get_target
     {
         # -E '[0-9.]+' == Print only numbers (0-9)
@@ -123,23 +122,21 @@ function remove_entry
     }
 
     let x=1
-    while ( command -v entry_$x &>/dev/null ); do
-    {
-        entry_$x; let x++
-        test "$Label" || abort "No label set in configuration"
+    entry_$x
 
-        entryExists && efibootmgr -B -b "$(getTarget)" | grep " $Label" &>$LogFile
+    test "$Label" || abort "No label set in configuration"
+    entry_exists && efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
 
-        if ( entryExists ) && ( bool "$Repeat" ); then
-        {
-            while ( entryExists ); do
-            {
-                efibootmgr -B -b "$(getTarget)" | grep " $Label" &>$LogFile
-            } done
-        } fi
-        unset -f get_target entry_exists
-        entryExists && abort "$Label: Failed to remove boot entry." || echo "$Label: Removed boot entry."
-    } done
+    if ! ( entry_exists ); then {
+        echo "$Label: Removed boot entry."
+    } elif ( bool "$Repeat" ); then {
+        until ! ( entry_exists ); do {
+            efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
+        } done
+        echo "$Label: Removed boot entry."
+    } else {
+        abort "$Label: Failed to remove boot entry."
+    } fi
 }
 
 function list_entry
@@ -147,8 +144,7 @@ function list_entry
     echo "Current entries:"
 
     let x=1
-    while ( command -v entry_$x &>/dev/null ); do
-    {
+    while ( command -v entry_$x &>/dev/null ); do {
         entry_$x
         efibootmgr | grep -q " $Label" && echo "($x) $Label"
         let x++
@@ -159,8 +155,7 @@ function parse_arg
 {
     test "$ARGN" = '0' && FirstAction="help"
 
-    for ARG in $ARGV; do
-    {
+    for ARG in $ARGV; do {
         case "$ARG" in
             "h") FirstAction="help" ;;
             "v") Verbose=true ;;
@@ -171,9 +166,6 @@ function parse_arg
             *) abort "$ARG: Unrecognised argument" ;;
         esac
     } done
-
-    test "$FirstAction" == "remove_entry" -o "$SecondAction" && SanityCheck=true
-    test "$FirstAction" -a ! "$SecondAction" && SanityCheck=false
 }
 
 function main
@@ -188,10 +180,6 @@ function main
     ConfigDir="$(dirname $ConfigFile)"
 
     parse_arg
-    if ( bool "$SanityCheck" ); then
-    {
-        sanity_check; config
-    } fi
     bool "$Verbose" && LogFile="/dev/stdout" || LogFile="/dev/null"
     test "$FirstAction" && $FirstAction
     test "$SecondAction" && $SecondAction
