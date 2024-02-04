@@ -23,8 +23,9 @@ function help
     echo "Usage: ${0##*/} [Argument]"
     echo "stubload: A bash script to create a kernel EFI boot entry"
     echo ""
-    echo "  -h   Show this help prompt"
-    echo "  -v   Verbose output"
+    echo "  -h   Print this help prompt"
+    echo "  -v   Print current version"
+    echo "  -V   Verbose output"
     echo "  -R   Allow repeated removals"
     echo "  -l   List boot entry(s)"
     echo "  -c   Creates the boot entry(s)"
@@ -153,10 +154,10 @@ function list_entry
 
 function version
 {
+    Source="https://raw.githubusercontent.com/9Omori/stubload/main"
     function version_check
     {
-        curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/stubload.sha512sum -o /tmp/$0-version.sha512sum
-        if cmp -s <(sha512sum $0) /tmp/$0-version.sha512sum; then {
+        if ! cmp -s <(curl -Ls $Source/stubload.sha512sum | sha512sum) <(sha512sum $0); then {
             UpdateAvailable=true
         } fi
     }
