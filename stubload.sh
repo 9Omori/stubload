@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 
-ConfigFile="/etc/efistub/stubload.conf"
-ConfigDir="$(dirname $ConfigFile)"
-
 function abort
 {
-    echo -e "ERROR: $@"
+    # \e[1;31m == Dark red
+    # \e[0m    == Default (white, etc)
+    echo -e "\e[1;31mERROR: \e[0m$@"
     exit 1
+}
+
+function warn
+{
+    echo -e "\e[1;31mWARNING: \e[0m$@"
 }
 
 function bool
 {
-    test "$1" == "true" -o "$1" == '1'
+    test "$1" == "true" -o "$1" = '1'
 }
 
 function help
@@ -28,139 +32,168 @@ function help
     echo ""
 }
 
-function sanityCheck
+function sanity_check
 {
-    function rootCheck
+    function root_check
     {
-        test "$(id -u)" == '0' -o "${USER}" == "root"
+        # id -u == Print current user's UID (root = 0)
+        test "$(id -u)" = '0' -o "$USER" == "root"
     }
-    function depCheck
+    function dep_check
     {
+        # command -v == Alternative to 'which'
         command -v "efibootmgr" &>/dev/null
     }
-    function uefiCheck
+    function uefi_check
     {
+        # /sys/firmware/efi == Kernel interface to EFI variables
         efibootmgr &>/dev/null && test -d "/sys/firmware/efi"
     }
-    rootCheck || abort "The selected action must be ran as root."
-    depCheck || abort "efibootmgr is missing."
-    uefiCheck || abort "EFI variables not found, stubload is only compatible with UEFI-based systems."
-    test -d "${ConfigDIr}" || mkdir -v "${ConfigDir}"
+    root_check || abort "The selected action must be ran as root."
+    dep_check || abort "efibootmgr is missing."
+    uefi_check || abort "EFI variables not found, stubload is only compatible with UEFI-based systems."
+    test -d "$ConfigDir" || mkdir -v $ConfigDir
     unset -f passRoot
 }
 
 function config
 {
-    . "${ConfigFile}" &>/dev/null || abort "${ConfigFile}: Could not source configuration file."
+    # '.' == POSIX compatible equivilent to bash's 'source'
+    . "$ConfigFile" &>/dev/null || abort "$ConfigFile: Could not source configuration file."
 }
 
-function createEntry
+function parse_config
+{
+    function label { Label="$@" ;}
+    function target { Target="$@" ;}
+    function cmdline { [ "$@" ] && Unicode="$(cat $ConfigDir/$@)" ;}
+    function ramdisk { [ -f "$@" ] && Unicode+=" initrd=$@ " ;} 
+    
+    # '//p*' == Remove 'p' & everything after 'p'
+    # '//*p' == Remove 'p' & everything before 'p'
+    Part="$(cat /proc/mounts | grep " $BootDir " | awk '{print $1}')"
+    Disk="${Part//p*}"
+    PartNum="${Part//*p}"
+}
+
+function create_entry
 {
     cd $ConfigDir
     let x=1
-    until ! command -v entry_${x} &>/dev/null; do
-        entry_${x}; let x++
-        if ! test "${BootDir}" -a "${BootDir}" -a "${Target}" -a "${Label}"; then
-            abort "Required fields are missing. Please edit ${ConfigFile} and fill in these fields."
-        fi
+    while ( command -v entry_$x &>/dev/null ); do
+    {
+        let x++
+        if ! ( test "$BootDir" -a "$BootDir" -a "$Target" -a "$Label" ); then
+        {
+            abort "Required fields are missing. Fix $ConfigFile to continue."
+        } fi
 
-        if efibootmgr | grep -q " ${Label}"; then
-            echo "WARNING: ${Label}: Entry is listed more than once. This may cause issues."
+        if ( efibootmgr | grep -q " $Label" ); then
+        {
+            warn "$Label: Entry is listed more than once. This may cause issues."
             echo "Use '-crR' to remove entries with the same name."
-        fi
+        } fi
 
-        local Part="$(cat /proc/mounts | grep " ${BootDir} " | awk '{print $1}')"
-        local Disk="${Part//p*}"
-        local PartNum="${Part//*p}"
-        local Unicode="$(test "$Ramdisk" && echo initrd=$Ramdisk) $(test -f "$Cmdline" && cat ${Cmdline})"
+        parse_config; entry_$x
+        efibootmgr -c -d "$Disk" -p "$PartNum" -L "$Label" -l "$Target" -u "$Unicode" | grep " $Label" &>$LogFile
 
-        efibootmgr -c -d "${Disk}" -p "${PartNum}" -L "${Label}" -l "${Target}" -u "${Unicode}" | grep " ${Label}" &>${OutputFile}
+        unset "Part" "Disk" "PartNum" "Unicode" "Ramdisk" "Cmdline" "Target" -f entryExists
 
-        unset Part Disk PartNum Unicode Ramdisk Cmdline Target Label -f entryExists
-
-        if efibootmgr | grep -q " ${Label}"; then
-            echo "${Label}: Added boot entry successfully."
-        else
-            abort "${Label}: Failed to add boot entry."
-        fi
-    done
+        if ( efibootmgr | grep -q " $Label" ); then
+        {
+            echo "$Label: Added boot entry successfully."
+        } else
+        {
+            abort "$Label: Failed to add boot entry."
+        } fi
+    } done
 }
 
-function removeEntry
+function remove_entry
 {
-    function getTarget
+    function get_target
     {
-        efibootmgr | grep " ${Label}" | sed -n '1p' | awk '{print $1}' | grep -E -o '[0-9.]+'
+        # -E '[0-9.]+' == Print only numbers (0-9)
+        efibootmgr | grep " $Label" | sed -n '1p' | awk '{print $1}' | grep -E -o '[0-9.]+'
     }
-    function entryExists
+    function entry_exists
     {
-        efibootmgr | grep -q "Boot$(getTarget)\*"
+        efibootmgr | grep -q "Boot$(get_target)\*"
     }
 
     let x=1
-    until ! command -v entry_${x} &>/dev/null; do
-        entry_${x}; let x++
-        test "${Label}" || abort "No label set in configuration"
+    while ( command -v entry_$x &>/dev/null ); do
+    {
+        entry_$x; let x++
+        test "$Label" || abort "No label set in configuration"
 
-        entryExists && efibootmgr -B -b "$(getTarget)" | grep " ${Label}" &>${OutputFile}
+        entryExists && efibootmgr -B -b "$(getTarget)" | grep " $Label" &>$LogFile
 
-        if entryExists && bool "$Repeat"; then
-            while entryExists; do
-                efibootmgr -B -b "$(getTarget)" | grep " ${Label}" &>${OutputFile}
-            done
-        fi
-        unset -f getTarget entryExists
-        entryExists && abort "${Label}: Failed to remove boot entry." || echo "${Label}: Removed boot entry."
-    done
+        if ( entryExists ) && ( bool "$Repeat" ); then
+        {
+            while ( entryExists ); do
+            {
+                efibootmgr -B -b "$(getTarget)" | grep " $Label" &>$LogFile
+            } done
+        } fi
+        unset -f get_target entry_exists
+        entryExists && abort "$Label: Failed to remove boot entry." || echo "$Label: Removed boot entry."
+    } done
 }
 
-function listEntry
+function list_entry
 {
     echo "Current entries:"
 
     let x=1
-    until ! command -v entry_${x} &>/dev/null; do
-        entry_${x}
-        efibootmgr | grep -q " ${Label}" && echo "(${x}) ${Label}"
+    while ( command -v entry_$x &>/dev/null ); do
+    {
+        entry_$x
+        efibootmgr | grep -q " $Label" && echo "($x) $Label"
         let x++
-    done
+    } done
 }
 
-ARGV=( $(echo $@ | sed 's/-//g; s/./& /g') )
-ARGN="$(echo $@ | wc -w)"
-
-function parseArg
+function parse_arg
 {
-    test "${ARGN}" == '0' && FirstAction="help"
+    test "$ARGN" = '0' && FirstAction="help"
 
-    for ARG in ${ARGV[@]}; do
+    for ARG in $ARGV; do
+    {
         case "$ARG" in
             "h") FirstAction="help" ;;
             "v") Verbose=true ;;
             "R") Repeat=true ;;
-            "l") FirstAction="listEntry" ;;
-            "c") SecondAction="createEntry" ;;
-            "r") FirstAction="removeEntry" ;;
-            *) abort "${ARG}: Unrecognised argument" ;;
+            "l") FirstAction="list_entry" ;;
+            "c") SecondAction="create_entry" ;;
+            "r") FirstAction="remove_entry" ;;
+            *) abort "$ARG: Unrecognised argument" ;;
         esac
-    done
+    } done
 
-    if test "$FirstAction" == "removeEntry"; then
-        SanityCheck=true
-    elif test "$FirstAction" -a ! "$SecondAction"; then
-        SanityCheck=false
-    elif test "$SecondAction"; then
-        SanityCheck=true
-    fi
+    test "$FirstAction" == "remove_entry" -o "$SecondAction" && SanityCheck=true
+    test "$FirstAction" -a ! "$SecondAction" && SanityCheck=false
 }
 
 function main
 {
-    config; parseArg
-    bool "${SanityCheck}" && sanityCheck
-    bool "${Verbose}" && OutputFile="/dev/stdout" || OutputFile="/dev/null"
-    test "${FirstAction}" && ${FirstAction}
-    test "${SecondAction}" && ${SecondAction}
+    # 's/-//g'   == Removes all '-' from arguments
+    # 's/./& /g' == Add space between each character
+    #  wc -w     == Count all words
+    ARGV="$(echo $@ | sed 's/-//g; s/./& /g')"
+    ARGN="$(echo $@ | wc -w)"
+
+    ConfigFile="/etc/efistub/stubload.conf"
+    ConfigDir="$(dirname $ConfigFile)"
+
+    parse_arg
+    if ( bool "$SanityCheck" ); then
+    {
+        sanity_check; config
+    } fi
+    bool "$Verbose" && LogFile="/dev/stdout" || LogFile="/dev/null"
+    test "$FirstAction" && $FirstAction
+    test "$SecondAction" && $SecondAction
     exit 0
 }
-main
+main $@

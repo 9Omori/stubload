@@ -35,6 +35,12 @@ One-line install:
 
 `$ curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/install.sh | sudo bash`
 
+Or:
+
+`$ curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/install.sh | sudo env DONT_DOWNLOAD_CONFIG=1 bash`
+
+To stop from overwriting the configuration file
+
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
 
