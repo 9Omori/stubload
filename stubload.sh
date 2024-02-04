@@ -157,7 +157,7 @@ function version
     Source="https://raw.githubusercontent.com/9Omori/stubload/main"
     function version_check
     {
-        if ! cmp -s <(curl -Ls $Source/stubload.sha512sum | sha512sum) <(sha512sum $0); then {
+        if ! cmp -s <(curl -Ls $Source/stubload.sha512sum) <(sha512sum $0); then {
             UpdateAvailable=true
         } fi
     }
