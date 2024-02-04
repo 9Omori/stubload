@@ -17,7 +17,7 @@ function download
 function verify
 {
     echo "Checking $1 against $2"
-    if cmp -s <(sha512sum $1) <(curl -Ls $2 | sha512sum); then {
+    if ! cmp -s <(sha512sum $1 | awk '{print $1}') <(curl -Ls $2 | sha512sum | awk '{print $1}'); then {
         rm -f $1
         abort "$1: Failed sha512sum check!"
     } else {
