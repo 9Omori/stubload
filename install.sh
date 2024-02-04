@@ -50,7 +50,7 @@ function main
     download $Source/stubload.sh /usr/local/bin/stubload
     test "$DONT_DOWNLOAD_CONFIG" || download $Source/stubload.conf /etc/efistub/stubload.conf
 
-    verify /usr/local/bin/stubload $Source/stubload.sha512sum
+    verify /usr/local/bin/stubload $Source/stubload.sh
 
     set_perm "/usr/local/bin/stubload"
     set_perm "/etc/efistub"
