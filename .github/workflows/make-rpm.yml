@@ -22,13 +22,13 @@ jobs:
       run: |
         cd ~/rpmbuild
         mkdir stubload
+        mkdir SOURCES SPECS
         mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload/
-        mkdir SPECS
         mv ~/stubload/.github/build/rpm/stubload.spec SPECS/
         sudo chmod +x stubload/stubload.sh
         sudo chown -R root:root stubload
         sudo chmod 700 stubload
-        sudo tar -czvf stubload.tgz stubload
+        sudo tar -czvf SOURCES/stubload.tgz stubload
 
     - name: Build RPM package
       run: |
