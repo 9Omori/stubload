@@ -16,7 +16,6 @@ Requires: bash efibootmgr
 %setup -q
 
 %install
-rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/usr/bin $RPM_BUILD_ROOT/etc/efistub
 cp %{name}.sh $RPM_BUILD_ROOT/usr/bin/%{name}
 cp %{name}.conf $RPM_BUILD_ROOT/etc/efistub/
