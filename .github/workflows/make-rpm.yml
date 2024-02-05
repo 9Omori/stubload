@@ -18,21 +18,16 @@ jobs:
 
     - name: Install dependencies
       run: |
-        distrobox-enter fedora
-        sudo dnf makecache
-        sudo dnf install -y rpmdevtools git
-        exit 0
+        distrobox-enter fedora -- sudo dnf makecache
+        distrobox-enter fedora -- sudo dnf install -y rpmdevtools git
      
     - name: Clone repository
       run: |
-        distrobox-enter fedora
-        rpmdev-setuptree
+        distrobox-enter fedora -- rpmdev-setuptree
         git clone https://github.com/9Omori/stubload.git ~/stubload
-        exit 0
   
     - name: Setup RPM build environment
       run: |
-        sudo distrobox-enter fedora
         cd ~/rpmbuild
         mkdir stubload-0.0.1
         ln -s stubload-0.0.1 stubload
@@ -46,9 +41,7 @@ jobs:
 
     - name: Build RPM package
       run: |
-        sudo distrobox-enter fedora
-        cd ~/rpmbuild
-        rpmbuild -bb SPECS/stubload.spec
+        sudo distrobox-enter fedora -- "cd ~/rpmbuild; rpmbuild -bb SPECS/stubload.spec"
         mv ~/rpmbuild/RPMS/noarch/*.rpm ~
 
     - name: Upload final output
