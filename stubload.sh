@@ -54,7 +54,6 @@ function sanity_check
     dep_check || abort "efibootmgr is missing."
     uefi_check || abort "EFI variables not found, stubload is only compatible with UEFI-based systems."
     test -d "$ConfigDir" || mkdir -v $ConfigDir
-    unset -f passRoot
 }
 
 function config
