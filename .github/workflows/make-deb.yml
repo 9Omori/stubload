@@ -1,0 +1,47 @@
+name: Make "deb" package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        build-dir: stubload-0.0.1
+
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Setup DEB structure
+      run: |
+        mkdir ~/deb
+      
+    - name: Clone repository
+      run: |
+        cd ~/deb
+        git clone https://github.com/9Omori/stubload.git source/
+
+    - name: Setup DEB environment
+      run: |
+        mkdir ~/deb/build
+        cd ~/deb/build
+        mkdir -p usr/bin etc/efistub
+        mkdir DEBIAN
+        mv ../source/.github/build/deb/control DEBIAN
+        mv ../source/*.sh usr/bin
+        mv ../source/*.conf etc/efistub
+        chmod +x usr/bin/stubload
+        chown -R root:root etc/efistub
+        chmod 700 etc/efistub
+
+    - name: Build DEB package
+      run: |
+        cd ~/deb/build
+        dpkg-deb --root-owner-group --build stubload
+        mv *.deb ~
+
+    - name: Upload final output
+      uses: actions/upload-artifact@v3
+      with:
+        name: deb-out
+        path: ~/*.deb

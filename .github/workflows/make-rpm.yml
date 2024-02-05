@@ -1,0 +1,49 @@
+name: Make "rpm" package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        build-dir: stubload-0.0.1
+
+    runs-on: fcos
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo dnf makecache
+        sudo dnf install -y rpmdevtools
+
+    - name: Setup RPM structure
+      run: |
+        rpmdev-setuptree
+      
+    - name: Clone repository
+      run: |
+        cd ~/rpmbuild
+        git clone https://github.com/9Omori/stubload.git ~/stubload
+  
+    - name: Setup RPM build environment
+      run: |
+        cd ~/rpmbuild
+        mkdir ${{ build-dir }}
+        mv ~/stubload/stubload.sh ~/stubload/stubload.conf ${{ build-dir }}
+        mv ~/stubload/.github/build/rpm/stubload.spec SPECS
+        chmod +x ${{ build-dir }}/stubload.sh
+        chown -R root:root ${{ build-dir }}
+        chmod 700 ${{ build-dir }}
+        tar -czvf SOURCES/${{ build-dir }}.tgz ${{ build-dir }}
+
+    - name: Build RPM package
+      run: |
+        cd ~/rpmbuild
+        rpmbuild -bb SPECS/stubload.spec
+        mv ~/rpmbuild/RPMS/noarch/*.rpm ~
+
+    - name: Upload final output
+      uses: actions/upload-artifact@v3
+      with:
+        name: rpm-out
+        path: ~/*.rpm
