@@ -1,4 +1,4 @@
-name: Make "deb" package
+name: Debian package
 
 on:
   workflow_dispatch:

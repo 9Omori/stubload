@@ -1,0 +1,41 @@
+name: Universal package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install git tar zstd
+      
+    - name: Clone repository
+      run: |
+        git clone https://github.com/9Omori/stubload.git ~/source
+
+    - name: Create structure
+      run: |
+        cd ~/source
+        mkdir -p usr/bin etc/efistub
+        mv stubload.sh usr/bin
+        mv stubload.conf etc/efistub
+        sudo chmod +x usr/bin/stubload
+        sudo chown -R root:root etc/efistub
+        sudo chmod 700 etc/efistub
+        rm -rf !(usr|etc) .github .git
+
+    - name: Create tarball
+      run: |
+        cd ~/source
+        tar --zstd -cvf stubload-linux-allarch.tzst *
+        mv *.tzst ~
+  
+    - name: Upload final output
+      uses: actions/upload-artifact@v3
+      with:
+        name: deb-out
+        path: ~/*.tzst

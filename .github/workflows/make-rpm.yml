@@ -1,4 +1,4 @@
-name: Make "rpm" package
+name: RedHat package
 
 on:
   workflow_dispatch:

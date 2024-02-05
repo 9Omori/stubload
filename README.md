@@ -37,7 +37,7 @@ If your distro uses RPM (openSUSE, Fedora) or DEB (Debian, Ubuntu), go to:
 
 If not, or you want to install manually, run:
 
-`$ curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/install.sh | sudo bash`
+`$ curl -Ls https://github.com/9Omori/stubload/releases/download/0.0.1/stubload-0.0.1-1.tzst | zstd -d | sudo tar -x -C /`
 
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
