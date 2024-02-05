@@ -31,15 +31,13 @@ List entries:
 * The kernel must have EFIStub supported
 
 ## Installation
-One-line install:
+If your distro uses RPM (openSUSE, Fedora) or DEB (Debian, Ubuntu), go to:
+
+[Releases](https://github.com/9Omori/stubload/releases/latest)
+
+If not, or you want to install manually, run:
 
 `$ curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/install.sh | sudo bash`
-
-Or:
-
-`$ curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/install.sh | sudo env DONT_DOWNLOAD_CONFIG=1 bash`
-
-To stop from overwriting the configuration file
 
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
