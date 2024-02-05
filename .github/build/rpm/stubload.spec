@@ -17,13 +17,13 @@ Requires: bash efibootmgr
 
 %install
 rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT/%{_bindir} $RPM_BUILD_ROOT/%{_sysconfdir}/efistub
-cp %{name}.sh $RPM_BUILD_ROOT/%{_bindir}/%{name}
+mkdir -p $RPM_BUILD_ROOT/usr/bin $RPM_BUILD_ROOT/etc/efistub
+cp %{name}.sh $RPM_BUILD_ROOT/usr/bin/%{name}
 cp %{name}.conf $RPM_BUILD_ROOT/etc/efistub/
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%{_bindir}/%{name}
-%{_sysconfdir}/efistub/%{name}.conf
+/usr/bin/%{name}
+/etc/efistub/%{name}.conf

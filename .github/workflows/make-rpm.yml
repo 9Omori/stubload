@@ -33,7 +33,7 @@ jobs:
     - name: Build RPM package
       run: |
         cd ~/rpmbuild
-        rpmbuild -bb SPECS/stubload.spec
+        rpmbuild -bb --define "_topdir $(pwd)" SPECS/stubload.spec
         mv ~/rpmbuild/RPMS/noarch/*.rpm ~
 
     - name: Upload final output
