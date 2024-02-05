@@ -15,14 +15,15 @@ jobs:
     - name: Clone repository
       run: |
         mkdir ~/rpmbuild
-        cd ~/rpmbuild
-        git clone https://github.com/9Omori/stubload.git ~/stubload
+        cd
+        git clone https://github.com/9Omori/stubload.git ~/rpmbuild/stubload
+        ln -s stubload stubload-0.0.1
   
     - name: Setup RPM build environment
       run: |
         cd ~/rpmbuild
         mkdir stubload
-        mkdir SOURCES SPECS
+        mkdir SOURCES SPECS BUILD
         mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload/
         mv ~/stubload/.github/build/rpm/stubload.spec SPECS/
         sudo chmod +x stubload/stubload.sh
