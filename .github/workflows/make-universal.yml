@@ -31,8 +31,8 @@ jobs:
     - name: Create tarball
       run: |
         cd ~/source
-        tar --zstd -cvf stubload-linux-allarch.tzst *
-        mv *.tzst ~
+        sudo tar --zstd -cvf stubload-linux-allarch.tzst *
+        sudo mv *.tzst ~
   
     - name: Upload final output
       uses: actions/upload-artifact@v3
