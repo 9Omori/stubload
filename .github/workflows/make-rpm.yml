@@ -5,19 +5,16 @@ on:
 
 jobs:
   build:
-    runs-on: fcos
+    runs-on: ubuntu-latest
     steps:
     - name: Install dependencies
       run: |
-        sudo dnf makecache
-        sudo dnf install -y rpmdevtools
-
-    - name: Setup RPM structure
-      run: |
-        rpmdev-setuptree
+        sudo apt update
+        sudo apt install -y rpm
       
     - name: Clone repository
       run: |
+        mkdir ~/rpmbuild
         cd ~/rpmbuild
         git clone https://github.com/9Omori/stubload.git ~/stubload
   
@@ -25,12 +22,12 @@ jobs:
       run: |
         cd ~/rpmbuild
         mkdir stubload
-        mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload
-        mv ~/stubload/.github/build/rpm/stubload.spec SPECS
-        chmod +x stubload/stubload.sh
-        chown -R root:root stubload
-        chmod 700 stubload
-        tar -czvf SOURCES/stubload.tgz stubload
+        mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload/
+        mv ~/stubload/.github/build/rpm/stubload.spec ./
+        sudo chmod +x stubload/stubload.sh
+        sudo chown -R root:root stubload
+        sudo chmod 700 stubload
+        sudo tar -czvf stubload.tgz stubload
 
     - name: Build RPM package
       run: |
