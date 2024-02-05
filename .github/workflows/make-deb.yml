@@ -34,8 +34,8 @@ jobs:
       run: |
         cd ~/deb/build
         sudo dpkg-deb --root-owner-group --build $(pwd)
-        sudo chown $USER *.deb
-        mv *.deb ~
+        sudo chown $USER ../*.deb
+        mv ../*.deb ~
 
     - name: Upload final output
       uses: actions/upload-artifact@v3

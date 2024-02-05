@@ -28,7 +28,7 @@ jobs:
         sudo chmod +x stubload/stubload.sh
         sudo chown -R root:root stubload
         sudo chmod 700 stubload
-        sudo tar -czvf SOURCES/stubload.tgz stubload
+        sudo tar -czvf SOURCES/stubload-0.0.1.tgz stubload
 
     - name: Build RPM package
       run: |
