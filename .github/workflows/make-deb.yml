@@ -24,8 +24,8 @@ jobs:
         mkdir -p usr/bin etc/efistub
         mkdir DEBIAN
         mv ../source/.github/build/deb/control DEBIAN
-        mv ../source/*.sh usr/bin
-        mv ../source/*.conf etc/efistub
+        mv ../source/stubload.sh usr/bin/stubload
+        mv ../source/stubload.conf etc/efistub
         chmod +x usr/bin/stubload
         chown -R root:root etc/efistub
         chmod 700 etc/efistub
