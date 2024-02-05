@@ -9,13 +9,13 @@ jobs:
     steps:
     - name: Install Distrobox
       run: |
-        sudo apt update
         sudo add-apt-repository universe
+        sudo apt update
         sudo apt install -y distrobox podman
 
     - name: Create Fedora container
       run: |
-        distrobox-create -Y --name fedora --image fedora
+        distrobox-create --yes --name fedora --image fedora
 
     - name: Install dependencies
       run: |
