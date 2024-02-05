@@ -7,7 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        build-dir: stubload-0.0.1
+        build_dir: ["stubload-0.0.1"]
 
     runs-on: fcos
     steps:
@@ -28,13 +28,13 @@ jobs:
     - name: Setup RPM build environment
       run: |
         cd ~/rpmbuild
-        mkdir ${{ build-dir }}
-        mv ~/stubload/stubload.sh ~/stubload/stubload.conf ${{ build-dir }}
+        mkdir ${{ build_dir }}
+        mv ~/stubload/stubload.sh ~/stubload/stubload.conf ${{ build_dir }}
         mv ~/stubload/.github/build/rpm/stubload.spec SPECS
-        chmod +x ${{ build-dir }}/stubload.sh
-        chown -R root:root ${{ build-dir }}
-        chmod 700 ${{ build-dir }}
-        tar -czvf SOURCES/${{ build-dir }}.tgz ${{ build-dir }}
+        chmod +x ${{ build_dir }}/stubload.sh
+        chown -R root:root ${{ build_dir }}
+        chmod 700 ${{ build_dir }}
+        tar -czvf SOURCES/${{ build_dir }}.tgz ${{ build_dir }}
 
     - name: Build RPM package
       run: |
