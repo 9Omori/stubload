@@ -23,7 +23,8 @@ jobs:
         cd ~/rpmbuild
         mkdir stubload
         mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload/
-        mv ~/stubload/.github/build/rpm/stubload.spec ./
+        mkdir SPECS
+        mv ~/stubload/.github/build/rpm/stubload.spec SPECS/
         sudo chmod +x stubload/stubload.sh
         sudo chown -R root:root stubload
         sudo chmod 700 stubload
