@@ -5,24 +5,23 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: fedora-latest
     steps:
     - name: Install dependencies
       run: |
-        sudo apt update
-        sudo apt install -y rpm
-      
+        sudo dnf makecache
+        sudo dnf install -y rpmdevtools rpmlint
+     
     - name: Clone repository
       run: |
-        mkdir ~/rpmbuild
+        rpmdev-setuptree
         git clone https://github.com/9Omori/stubload.git ~/stubload
   
     - name: Setup RPM build environment
       run: |
         cd ~/rpmbuild
-        mkdir stubload
-        mkdir SOURCES SPECS BUILD
-        ln -s stubload stubload-0.0.1
+        mkdir stubload-0.0.1
+        ln -s stubload-0.1.1 stubload
         mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload/
         mv ~/stubload/.github/build/rpm/stubload.spec SPECS/
         sudo chmod +x stubload/stubload.sh
@@ -33,7 +32,7 @@ jobs:
     - name: Build RPM package
       run: |
         cd ~/rpmbuild
-        rpmbuild -bb --define "_topdir $(pwd)" SPECS/stubload.spec
+        rpmbuild -bb SPECS/stubload.spec
         mv ~/rpmbuild/RPMS/noarch/*.rpm ~
 
     - name: Upload final output
