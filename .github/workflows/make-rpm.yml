@@ -9,7 +9,7 @@ jobs:
     steps:
     - name: Install Distrobox
       run: |
-        sudo apt makecache
+        sudo apt update
         sudo apt install -y distrobox podman
 
     - name: Create Fedora container
