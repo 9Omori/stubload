@@ -41,7 +41,7 @@ jobs:
 
     - name: Build RPM package
       run: |
-        sudo distrobox-enter fedora -- "cd ~/rpmbuild; rpmbuild -bb SPECS/stubload.spec"
+        distrobox-enter fedora -- "cd ~/rpmbuild; rpmbuild -bb SPECS/stubload.spec"
         mv ~/rpmbuild/RPMS/noarch/*.rpm ~
 
     - name: Upload final output
