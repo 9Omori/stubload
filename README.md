@@ -31,13 +31,9 @@ List entries:
 * The kernel must have EFIStub supported
 
 ## Installation
-If your distro uses RPM (openSUSE, Fedora) or DEB (Debian, Ubuntu), go to:
+stubload comes packaged in RPM (Fedora, openSUSE), DEB (Debian, Ubuntu) & TAR (All)
 
-[Releases](https://github.com/9Omori/stubload/releases/latest)
-
-If not, or you want to install manually, run:
-
-`$ curl -Ls https://github.com/9Omori/stubload/releases/download/0.0.1/stubload-0.0.1-1.tzst | zstd -d | sudo tar -x -C /`
+Download from: [Releases](https://github.com/9Omori/stubload/releases/latest)
 
 ## Credits
 [rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
