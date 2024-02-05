@@ -26,7 +26,7 @@ function help
     echo "  -h   Print this help prompt"
     echo "  -v   Print current version"
     echo "  -V   Verbose output"
-    echo "  -R   Allow repeated removals"
+    echo "  -n   Don't recursively remove entry(s)"
     echo "  -l   List boot entry(s)"
     echo "  -c   Creates the boot entry(s)"
     echo "  -r   Removes boot entry(s)"
@@ -124,19 +124,22 @@ function remove_entry
     let x=1
     entry_$x
 
-    test "$Label" || abort "No label set in configuration"
-    entry_exists && efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
+    until ! ( command -v entry_$x &>/dev/null ); do {
+        entry_$x; let x++
+        test "$Label" || abort "No label set in configuration"
+        entry_exists && efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
 
-    if ! ( entry_exists ); then {
-        echo "$Label: Removed boot entry."
-    } elif ( bool "$Repeat" ); then {
-        until ! ( entry_exists ); do {
-            efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
-        } done
-        echo "$Label: Removed boot entry."
-    } else {
-        abort "$Label: Failed to remove boot entry."
-    } fi
+        if ! ( entry_exists ); then {
+            echo "$Label: Removed boot entry."
+        } elif ! ( bool "$DontRepeat" ); then {
+            until ! ( entry_exists ); do {
+                efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
+            } done
+            echo "$Label: Removed boot entry."
+        } else {
+            abort "$Label: Failed to remove boot entry."
+        } fi        
+    } done
 }
 
 function list_entry
@@ -172,7 +175,7 @@ function parse_arg
     for ARG in $ARGV; do {
         case "$ARG" in
             "V") Verbose=true ;;
-            "R") Repeat=true ;;
+            "n") DontRepeat=true ;;
             "h") FirstAction="help" ;;
             "v") FirstAction="version" ;;
             "l") FirstAction="list_entry" ;;

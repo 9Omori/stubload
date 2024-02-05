@@ -18,7 +18,7 @@ Create entries:
 
 Create entries & remove previous entries:
 
-`# stubload -crR`
+`# stubload -cr`
 
 List entries:
 
