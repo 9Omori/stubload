@@ -26,16 +26,27 @@ List entries:
 
 ## Prerequisites
 
-* A device with UEFI, not BIOS
-* `/boot` partition with the FAT filesystem, not EXT4
-* The kernel must have EFIStub supported
+* A UEFI device
+* `/boot` partition with the FAT filesystem
+* A kernel with EFIStub support
 
 ## Installation
-stubload comes packaged in RPM (Fedora, openSUSE), DEB (Debian, Ubuntu) & TAR (All)
+Fedora:
 
-Download from: [Releases](https://github.com/9Omori/stubload/releases/latest)
+`$ sudo dnf install <URL>.rpm`
+
+Debian:
+
+`$ curl -L <URL>.rpm | sudo dpkg -i`
+
+Manual:
+`$ curl -L <URL>.tzst | zstd -d | sudo tar -x -C /`
+
+[Releases](https://github.com/9Omori/stubload/releases/latest)
+
+After installation, edit `/etc/efistub/stubload.conf` to properly configure stubload
 
 ## Credits
-[rhboot/efibootmgr](https://github.com/rhboot/efibootmgr) - For making the tool this script uses
+[efibootmgr](https://github.com/rhboot/efibootmgr)
 
-[The Linux kernel](https://www.kernel.org/) - For making Linux
+[Linux](https://www.kernel.org/)
