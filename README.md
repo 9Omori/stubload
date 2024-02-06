@@ -31,6 +31,8 @@ List entries:
 * A kernel with EFIStub support
 
 ## Installation
+[Releases](https://github.com/9Omori/stubload/releases/latest)
+
 Fedora:
 
 `$ sudo dnf install <URL>.rpm`
@@ -40,9 +42,8 @@ Debian:
 `$ curl -L <URL>.rpm | sudo dpkg -i`
 
 Manual:
-`$ curl -L <URL>.tzst | zstd -d | sudo tar -x -C /`
 
-[Releases](https://github.com/9Omori/stubload/releases/latest)
+`$ curl -L <URL>.tzst | zstd -d | sudo tar -x -C /`
 
 After installation, edit `/etc/efistub/stubload.conf` to properly configure stubload
 
