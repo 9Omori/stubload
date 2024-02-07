@@ -22,7 +22,7 @@ Create entries & remove previous entries:
 
 List entries:
 
-`$ stubload -l`
+`# stubload -l`
 
 ## Prerequisites
 
@@ -35,15 +35,15 @@ List entries:
 
 Fedora:
 
-`$ sudo dnf install <URL>.rpm`
+`# dnf install <URL>.rpm`
 
 Debian:
 
-`$ curl -L <URL>.rpm | sudo dpkg -i`
+`# curl -L <URL>.rpm | dpkg -i`
 
 Manual:
 
-`$ curl -L <URL>.tzst | zstd -d | sudo tar -x -C /`
+`# curl -L <URL>.tzst | zstd -d | tar -x -C /`
 
 After installation, edit `/etc/efistub/stubload.conf` to properly configure stubload
 
