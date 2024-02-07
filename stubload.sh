@@ -1,36 +1,46 @@
 #!/usr/bin/bash
 
-function abort
-{
-    # \e[1;31m == Dark red
-    # \e[0m    == Default (white, etc)
-    echo -e "\e[1;31mERROR: \e[0m$@"
-    exit 1
-}
-
-function warn
-{
-    echo -e "\e[1;31mWARNING: \e[0m$@"
-}
-
 function bool
 {
     test "$1" == "true" -o "$1" = '1'
 }
 
+function print
+{
+    cat <<<"$@"
+}
+
+function fprint
+{
+    print "${0##*/}: $@"
+}
+
+function eprint
+{
+    fprint "$@"
+    (bool "$FORCE_COMPLETE") || exit 1
+}
+
+function execf
+{
+    command -v "$1" &>/dev/null
+}
+
 function help
 {
-    echo "Usage: ${0##*/} [Argument]"
-    echo "stubload: A bash script to create a kernel EFI boot entry"
-    echo ""
-    echo "  -h   Print this help prompt"
-    echo "  -v   Print current version"
-    echo "  -V   Verbose output"
-    echo "  -n   Don't recursively remove entry(s)"
-    echo "  -l   List boot entry(s)"
-    echo "  -c   Creates the boot entry(s)"
-    echo "  -r   Removes boot entry(s)"
-    echo ""
+    print "Usage: ${0##*/} <-h|-v|-V|-n|-s|-l|-c|-r> [--force]"
+    print ""
+    print "  -h   Print this help prompt"
+    print "  -v   Print current version"
+    print "  -V   Verbose output"
+    print "  -n   Don't recursively remove entry(s)"
+    print "  -s   Gain root permissions by sudo if not already root"
+    print "  -l   List boot entry(s)"
+    print "  -c   Creates the boot entry(s)"
+    print "  -r   Removes boot entry(s)"
+    print ""
+    print "  --force  Force program to continue regardless of warnings/errors"
+    print ""
 }
 
 function sanity_check
@@ -38,70 +48,79 @@ function sanity_check
     function root_check
     {
         # id -u == Print current user's UID (root = 0)
-        test "$(id -u)" = '0' -o "$USER" == "root"
-    }
-    function dep_check
-    {
-        # command -v == Alternative to 'which'
-        command -v "efibootmgr" &>/dev/null
+        if ! test "$(id -u)" = '0' -o "$USER" == "root"; then
+            eprint "The selected action must be ran as root."
+        fi
     }
     function uefi_check
     {
         # /sys/firmware/efi == Kernel interface to EFI variables
-        efibootmgr &>/dev/null && test -d "/sys/firmware/efi"
+        if ! efibootmgr &>/dev/null && test -d "/sys/firmware/efi"; then
+            eprint "EFI variables not found, stubload is only compatible with UEFI-based systems."
+        fi
     }
-    root_check || abort "The selected action must be ran as root."
-    dep_check || abort "efibootmgr is missing."
-    uefi_check || abort "EFI variables not found, stubload is only compatible with UEFI-based systems."
-    test -d "$ConfigDir" || mkdir -v $ConfigDir
+    root_check; uefi_check
+    test -d "$CONFIG_DIR" || mkdir -v $CONFIG_DIR
 }
 
 function config
 {
     # '.' == POSIX compatible equivilent to bash's 'source'
     parse_config
-    . "$ConfigFile" || abort "$ConfigFile: Failed to parse configuration file."
+    . "$CONFIG_FILE" || eprint "$CONFIG_FILE: Failed to access configuration file."
 }
 
 function parse_config
 {
-    function dir { BootDir="$@" ;}
-    function label { Label="$@" ;}
-    function target { Target="$@" ;}
-    function cmdline { Unicode="$@" ;}
-    function ramdisk { [ -f "$@" ] && Unicode+=" initrd=$@ " ;} 
+    function dir { BOOT_DIR="$@" ;}
+    function label { LABEL="$@" ;}
+    function target { TARGET="$@" ;}
+    function cmdline { UNICODE="$@" ;}
+    function ramdisk { [ -f "$@" ] && UNICODE+=" initrd=$@ " ;} 
+}
+
+function gain_root
+{
+    if test "$(id -u)" = '0' -o "$USER" == "root"; then
+        print "User is already root."
+    else
+        SHORTARGV="$(print $SHORTARGV | sed 's/s//' | tr -d "[:space:]")"
+        fprint "Attempting to elevate privileges."
+        print "Exec: $SHORTARGV"
+        sudo -u root -H "$SHELL" $0 -"$SHORTARGV"
+        exit $?
+    fi
 }
 
 function create_entry
 {
     sanity_check
     config
-    cd $ConfigDir
+    cd $CONFIG_DIR
 
     let x=1
-    until ! ( command -v entry_$x &>/dev/null ); do {
-        entry_$x
-        let x++
+    until ! (execf entry_$x); do {
+        entry_$x; let x++
 
-        if ( efibootmgr | grep -q " $Label" ); then {
-            warn "$Label: Entry is listed more than once. This may cause issues."
-            echo "Use '-crR' to remove entries with the same name."
+        if (grep -q " $LABEL" <(efibootmgr)); then {
+            fprint "${0##*/}: $LABEL: Entry is listed more than once. This may cause issues."
+            fprint "Use '-crR' to remove entries with the same name."
         } fi
 
         # '//p*' == Remove 'p' & everything after 'p'
         # '//*p' == Remove 'p' & everything before 'p'
-        Part="$(cat /proc/mounts | grep " $BootDir " | awk '{print $1}')"
-        Disk="${Part//p*}"
-        PartNum="${Part//*p}"
+        PART="$(grep " $BOOT_DIR " /proc/mounts | awk '{print $1}')"
+        DISK="${PART//p*}"
+        PART_NUM="${PART//*p}"
 
-        efibootmgr -c -d "$Disk" -p "$PartNum" -L "$Label" -l "$Target" -u "$Unicode" | grep "$Label" &>$LogFile
+        efibootmgr -c -d "$DISK" -p "$PART_NUM" -L "$LABEL" -l "$TARGET" -u "$UNICODE" | grep "$LABEL" >>$LOG
 
         unset "Part" "Disk" "PartNum" "Unicode" "Ramdisk" "Cmdline" "Target" -f "entryExists"
 
-        if ( efibootmgr | grep -q " $Label" ); then {
-            echo "$Label: Added boot entry successfully."
+        if (grep -q " $LABEL" <(efibootmgr)); then {
+            fprint "$LABEL: Added boot entry successfully."
         } else {
-            abort "$Label: Failed to add boot entry."
+            eprint "$LABEL: Failed to add boot entry."
         } fi
     } done
 }
@@ -111,96 +130,122 @@ function remove_entry
     sanity_check
     config
 
-    function get_target
+    function target
     {
         # -E '[0-9.]+' == Print only numbers (0-9)
-        efibootmgr | grep " $Label" | sed -n '1p' | awk '{print $1}' | grep -E -o '[0-9.]+'
+        grep " $LABEL" <(efibootmgr) | sed -n '1p' | awk '{print $1}' | grep -E -o '[0-9.]+'
     }
     function entry_exists
     {
-        efibootmgr | grep -q "Boot$(get_target)\*"
+        grep -q "Boot$(target)\*" <(efibootmgr)
     }
 
     let x=1
     entry_$x
 
-    until ! ( command -v entry_$x &>/dev/null ); do {
+    until ! (execf entry_$x); do {
         entry_$x; let x++
-        test "$Label" || abort "No label set in configuration"
-        entry_exists && efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
+        test "$LABEL" || eprint "No label set in configuration"
+        entry_exists && efibootmgr -B -b "$(target)" | grep "$LABEL" &>$LOG
 
-        if ! ( entry_exists ); then {
-            echo "$Label: Removed boot entry."
-        } elif ! ( bool "$DontRepeat" ); then {
-            until ! ( entry_exists ); do {
-                efibootmgr -B -b "$(get_target)" | grep "$Label" &>$LogFile
+        if ! (entry_exists); then {
+            fprint "$LABEL: Removed boot entry."
+        } elif ! (bool "$DONT_REPEAT"); then {
+            until ! (entry_exists); do {
+                efibootmgr -B -b "$(target)" | grep "$LABEL" &>$LOG
             } done
-            echo "$Label: Removed boot entry."
+            fprint "$LABEL: Removed boot entry."
         } else {
-            abort "$Label: Failed to remove boot entry."
+            eprint "$LABEL: Failed to remove boot entry."
         } fi        
     } done
 }
 
 function list_entry
 {
-    echo "Current entries:"
+    print "Current entries:"
 
     let x=1
-    while ( command -v entry_$x &>/dev/null ); do {
-        entry_$x
-        efibootmgr | grep -q " $Label" && echo "($x) $Label"
-        let x++
+    until ! (execf entry_$x); do {
+        entry_$x; let x++
+        grep -q " $LABEL" <(efibootmgr) && print "$(($x-1))* $LABEL"
     } done
 }
 
 function version
 {
-    Source="https://raw.githubusercontent.com/9Omori/stubload/main"
-    function version_check
-    {
-        if ! cmp -s <(curl -Ls $Source/stubload.sh) $0; then {
-            UpdateAvailable=true
-        } fi
-    }
-    version_check
-    echo "stubload version 0.1"
-    ( bool "$UpdateAvailable" ) && echo "An update is available." || echo "No updates are available."
+    print "stubload version 0.1"
+    if cmp -s <(curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/stubload.sh) $0; then {
+        print "No updates are available."
+    } else {
+        print "An update is available."
+    } fi
 }
 
 function parse_arg
 {
-    test "$ARGN" = '0' && FirstAction="help"
+    # 's/-//g'   == Removes all '-' from arguments
+    # 's/./& /g' == Add space between each character
+    #  wc -w     == Count all words
+    SHORTARGV=$(
+        for ARG in $@; do {
+            case "$ARG" in
+                "--"*) false ;;
+                "-"*) sed 's/./& /g; s/-//g' <<<"$ARG" ;;
+            esac
+        } done
+    )
 
-    for ARG in $ARGV; do {
-        case "$ARG" in
-            "V") Verbose=true ;;
-            "n") DontRepeat=true ;;
-            "h") FirstAction="help" ;;
-            "v") FirstAction="version" ;;
-            "l") FirstAction="list_entry" ;;
-            "c") SecondAction="create_entry" ;;
-            "r") FirstAction="remove_entry" ;;
-            *) abort "$ARG: Unrecognised argument" ;;
+    LONGARGV=$(
+        for ARG in $@; do {
+            case "$ARG" in
+                "--"*) sed 's/--//g' <<<"$ARG" ;;
+            esac
+        } done
+    )
+
+    SHORTARGN="$(wc -w <<<"$SHORTARGV")"
+    LONGARGN="$(wc -w <<<"$LONGARGV")"
+
+    if test "$SHORTARGN" -lt '1'; then {
+        eprint "Insufficient arguments"
+    } fi
+
+    for LONGARG in $LONGARGV; do {
+        case "$LONGARG" in
+            "force") FORCE_COMPLETE=true ;;
+            *) eprint "Invalid argument -- $LONGARG" ;;
         esac
     } done
+
+    for SHORTARG in $SHORTARGV; do {
+        case "$SHORTARG" in
+            "V") VERBOSE=true ;;
+            "n") DONT_REPEAT=true ;;
+            "s") readonly arg0="gain_root" && ARGX+=" $arg0" ;;
+            "h") readonly arg1="help" && ARGX+=" $arg1" ;;
+            "v") readonly arg1="version" && ARGX+=" $arg1" ;;
+            "l") readonly arg1="list_entry" && ARGX+=" $arg1" ;;
+            "r") readonly arg1="remove_entry" && ARGX+=" $arg1" ;;
+            "c") readonly arg2="create_entry" && ARGX+=" $arg2" ;;
+            *) eprint "Invalid argument -- $SHORTARG" ;;
+        esac
+    } done
+    ARGX="$(sort -n <<<"$ARGX")"
 }
 
 function main
 {
-    # 's/-//g'   == Removes all '-' from arguments
-    # 's/./& /g' == Add space between each character
-    #  wc -w     == Count all words
-    ARGV="$(echo $@ | sed 's/-//g; s/./& /g')"
-    ARGN="$(echo $@ | wc -w)"
+    CONFIG_FILE="/etc/efistub/stubload.conf"
+    CONFIG_DIR="$(dirname $CONFIG_FILE)"
 
-    ConfigFile="/etc/efistub/stubload.conf"
-    ConfigDir="$(dirname $ConfigFile)"
+    parse_arg $@
+    bool "$VERBOSE" && LOG="/dev/stdout" || LOG="/dev/null"
 
-    parse_arg
-    bool "$Verbose" && LogFile="/dev/stdout" || LogFile="/dev/null"
-    test "$FirstAction" && $FirstAction
-    test "$SecondAction" && $SecondAction
+    for exec in $ARGX; do
+        $exec
+    done
+
     exit 0
 }
 main $@
