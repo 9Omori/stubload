@@ -86,7 +86,6 @@ function gain_root
     else
         SHORTARGV="$(print $SHORTARGV | sed 's/s//' | tr -d "[:space:]")"
         fprint "Attempting to elevate privileges."
-        print "Exec: $SHORTARGV"
         sudo -u root -H "$SHELL" $0 -"$SHORTARGV"
         exit $?
     fi
@@ -163,6 +162,9 @@ function remove_entry
 
 function list_entry
 {
+    sanity_check
+    config
+    
     print "Current entries:"
 
     let x=1
