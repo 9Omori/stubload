@@ -176,7 +176,7 @@ function list_entry
 
 function version
 {
-    print "stubload version 0.1"
+    print "stubload version 0.2"
     if cmp -s <(curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/stubload.sh) $0; then {
         print "No updates are available."
     } else {
