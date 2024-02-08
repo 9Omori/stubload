@@ -20,42 +20,42 @@ function bool
     test "$1" == "true" -o "$1" = '1'
 }
 
-function print
+function println
 {
-    cat <<<"$@"
+    printf "$@\n"
 }
 
-function fprint
+function fprintln
 {
-    print "${0##*/}: $@"
+    println "${0##*/}: $@"
 }
 
-function eprint
+function eprintln
 {
-    fprint "$@"
+    fprintln "${FRED}err:${FNONE} $@"
     (bool "$FORCE_COMPLETE") || exit 1
 }
 
-function execf
+function execq
 {
     command -v "$1" &>/dev/null
 }
 
 function help
 {
-    print "Usage: ${0##*/} <-h|-v|-V|-n|-s|-l|-c|-r> [--force]"
-    print ""
-    print "  -h   Print this help prompt"
-    print "  -v   Print current version"
-    print "  -V   Verbose output"
-    print "  -n   Don't recursively remove entry(s)"
-    print "  -s   Gain root permissions by sudo if not already root"
-    print "  -l   List boot entry(s)"
-    print "  -c   Creates the boot entry(s)"
-    print "  -r   Removes boot entry(s)"
-    print ""
-    print "  --force  Force program to continue regardless of warnings/errors"
-    print ""
+    println "Usage: ${0##*/} <-h|-v|-V|-s|-l|-c|-r> [--debug|--force]"
+    println ""
+    println " -h   Print help prompt"
+    println " -v   Enable verbose output"
+    println " -V   Print current version"
+    println " -s   Gain root permissions by sudo/doas"
+    println " -l   List boot entries"
+    println " -c   Create boot entries"
+    println " -r   Remove boot entries"
+    println ""
+    println " --debug   Add extra information for debugging"
+    println " --force   Force continue regardless of warnings/errors"
+    println ""
 }
 
 function sanity_check
@@ -63,64 +63,83 @@ function sanity_check
     function root_check
     {
         # id -u == Print current user's UID (root = 0)
-        if ! test "$(id -u)" = '0' -o "$USER" == "root"; then
-            eprint "The selected action must be ran as root."
-        fi
+        if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
+            eprintln "insufficient permissions"
+        } fi
     }
     function uefi_check
     {
         # /sys/firmware/efi == Kernel interface to EFI variables
-        if ! efibootmgr &>/dev/null && test -d "/sys/firmware/efi"; then
-            eprint "EFI variables not found, stubload is only compatible with UEFI-based systems."
-        fi
+        if ! ( (efibootmgr &>/dev/null) && (test -d "/sys/firmware/efi") ); then {
+            eprintln "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
+        } fi
     }
     root_check; uefi_check
-    test -d "$CONFIG_DIR" || mkdir -v $CONFIG_DIR
+    (test -d "$CONFIG_DIR") || mkdir -v $CONFIG_DIR
+}
+
+function debug
+{
+    :
+}
+
+function set_debug
+{
+    function debug
+    {
+        fprintln "${FCYAN}debug:${FNONE} $@"
+    }
 }
 
 function config
 {
     # '.' == POSIX compatible equivilent to bash's 'source'
     parse_config
-    . "$CONFIG_FILE" || eprint "$CONFIG_FILE: Failed to access configuration file."
+    debug "CONFIG_FILE = $CONFIG_FILE"
+    . "$CONFIG_FILE" || eprintln "$CONFIG_FILE: failed to access configuration file."
 }
 
 function parse_config
 {
-    function dir { BOOT_DIR="$@" ;}
-    function label { LABEL="$@" ;}
-    function target { TARGET="$@" ;}
-    function cmdline { UNICODE="$@" ;}
-    function ramdisk { [ -f "$@" ] && UNICODE+=" initrd=$@ " ;} 
+    function dir { BOOT_DIR="$1" ;}
+    function label { LABEL="$1" ;}
+    function target { TARGET="$1" ;}
+    function cmdline { UNICODE="$1" ;}
+    function ramdisk { test "$1" && UNICODE+=" initrd=$1 " ;} 
 }
 
 function gain_root
 {
-    if test "$(id -u)" = '0' -o "$USER" == "root"; then
-        print "User is already root."
-    else
-        SHORTARGV="$(print $SHORTARGV | sed 's/s//' | tr -d "[:space:]")"
-        fprint "Attempting to elevate privileges."
-        sudo -u root -H "$SHELL" $0 -"$SHORTARGV"
+    if (execq "sudo"); then {
+        debug "using sudo"
+    } elif (execq "doas"); then {
+        debug "Using doas to elevate privileges"
+        alias sudo=doas
+    } else {
+        eprintln "sudo/doas not found"
+    } fi
+    if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
+        SHORTARGV="$(sed 's/s//' <<<"$SHORTARGV" | tr -d "[:space:]")"
+        debug "SHORTARGV = $SHORTARGV"
+        sudo $0 -"$SHORTARGV"
         exit $?
-    fi
+    } fi
+}
+
+function entry_exists
+{
+    grep -q " $LABEL" <(efibootmgr)
 }
 
 function create_entry
 {
-    sanity_check
-    config
+    sanity_check; config
     cd $CONFIG_DIR
 
     let x=1
-    until ! (execf entry_$x); do {
+    until ! (execq entry_$x); do {
+        debug "X = $x"
         entry_$x; let x++
-
-        if (grep -q " $LABEL" <(efibootmgr)); then {
-            fprint "${0##*/}: $LABEL: Entry is listed more than once. This may cause issues."
-            fprint "Use '-crR' to remove entries with the same name."
-        } fi
-
         # '//p*' == Remove 'p' & everything after 'p'
         # '//*p' == Remove 'p' & everything before 'p'
         PART="$(grep " $BOOT_DIR " /proc/mounts | awk '{print $1}')"
@@ -129,74 +148,57 @@ function create_entry
 
         efibootmgr -c -d "$DISK" -p "$PART_NUM" -L "$LABEL" -l "$TARGET" -u "$UNICODE" | grep "$LABEL" >>$LOG
 
-        unset "Part" "Disk" "PartNum" "Unicode" "Ramdisk" "Cmdline" "Target" -f "entryExists"
-
-        if (grep -q " $LABEL" <(efibootmgr)); then {
-            fprint "$LABEL: Added boot entry successfully."
+        unset "PART" "DISK" "PART_NUM" "UNICODE" "RAMDISK" "CMDLINE" "TARGET"
+        if (entry_exists); then {
+            fprintln "$LABEL: added entry successfully"
         } else {
-            eprint "$LABEL: Failed to add boot entry."
+            eprintln "$LABEL: failed to add entry"
         } fi
     } done
 }
 
 function remove_entry
 {
-    sanity_check
-    config
-
-    function target
-    {
-        # -E '[0-9.]+' == Print only numbers (0-9)
-        grep " $LABEL" <(efibootmgr) | sed -n '1p' | awk '{print $1}' | grep -E -o '[0-9.]+'
-    }
-    function entry_exists
-    {
-        grep -q "Boot$(target)\*" <(efibootmgr)
-    }
+    sanity_check; config
 
     let x=1
-    entry_$x
-
-    until ! (execf entry_$x); do {
+    until ! (execq entry_$x); do {
+        debug "X = $x"
         entry_$x; let x++
-        test "$LABEL" || eprint "No label set in configuration"
-        entry_exists && efibootmgr -B -b "$(target)" | grep "$LABEL" &>$LOG
-
-        if ! (entry_exists); then {
-            fprint "$LABEL: Removed boot entry."
-        } elif ! (bool "$DONT_REPEAT"); then {
-            until ! (entry_exists); do {
-                efibootmgr -B -b "$(target)" | grep "$LABEL" &>$LOG
-            } done
-            fprint "$LABEL: Removed boot entry."
+        until ! (entry_exists); do {
+            # -n 1p       == Print first line only
+            # s/ .*//g    == Print first string only
+            # s/[^0-9]//g == Print only numbers
+            FNTARGET="$(grep "$LABEL" <(efibootmgr) | sed -n '1p' | sed 's/ .*//g; s/[^0-9]//g')"
+            debug "FNTARGET = $FNTARGET"
+            debug "LABEL = $LABEL"
+            (test "$FNTARGET") && efibootmgr -B -b "$FNTARGET" | grep "$LABEL" >>$LOG
+        } done
+        if (entry_exists); then {
+            eprintln "$LABEL: failed to remove entry"
         } else {
-            eprint "$LABEL: Failed to remove boot entry."
-        } fi        
+            fprintln "$LABEL: removed entry"
+        } fi
     } done
 }
 
 function list_entry
 {
-    sanity_check
-    config
-    
-    print "Current entries:"
+    sanity_check; config
 
     let x=1
-    until ! (execf entry_$x); do {
+    until ! (execq entry_$x); do {
         entry_$x; let x++
-        grep -q " $LABEL" <(efibootmgr) && print "$(($x-1))* $LABEL"
+        grep -q " $LABEL" <(efibootmgr) && println "$(($x-1))* $LABEL"
     } done
 }
 
 function version
 {
-    print "stubload version 0.2"
-    if cmp -s <(curl -Ls https://raw.githubusercontent.com/9Omori/stubload/main/stubload.sh) $0; then {
-        print "No updates are available."
-    } else {
-        print "An update is available."
-    } fi
+    VERSION="0.1.1"
+    println "stubload version $VERSION"
+    println "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
+    debug "Build sha1sum: $(sha1sum <$0 | sed 's/ .*//g')"
 }
 
 function parse_arg
@@ -224,45 +226,50 @@ function parse_arg
     SHORTARGN="$(wc -w <<<"$SHORTARGV")"
     LONGARGN="$(wc -w <<<"$LONGARGV")"
 
-    if test "$SHORTARGN" -lt '1'; then {
-        eprint "Insufficient arguments"
-    } fi
-
     for LONGARG in $LONGARGV; do {
         case "$LONGARG" in
             "force") FORCE_COMPLETE=true ;;
-            *) eprint "Invalid argument -- $LONGARG" ;;
+            "debug") set_debug ;;
+            *) eprintln "invalid argument -- $LONGARG" ;;
         esac
     } done
 
     for SHORTARG in $SHORTARGV; do {
         case "$SHORTARG" in
-            "V") VERBOSE=true ;;
+            "v") VERBOSE=true ;;
             "n") DONT_REPEAT=true ;;
             "s") readonly arg0="gain_root" && ARGX+=" $arg0" ;;
+            "V") readonly arg1="version" && ARGX+=" $arg1 " ;;
             "h") readonly arg1="help" && ARGX+=" $arg1" ;;
-            "v") readonly arg1="version" && ARGX+=" $arg1" ;;
             "l") readonly arg1="list_entry" && ARGX+=" $arg1" ;;
             "r") readonly arg1="remove_entry" && ARGX+=" $arg1" ;;
             "c") readonly arg2="create_entry" && ARGX+=" $arg2" ;;
-            *) eprint "Invalid argument -- $SHORTARG" ;;
+            *) eprintln "invalid argument -- $SHORTARG" ;;
         esac
     } done
-    ARGX="$(sort -n <<<"$ARGX")"
+    ARGX=( $(sort -n <<<"$ARGX") )
+
+    if ! (test "$ARGX"); then {
+        eprintln "insufficient arguments provided"
+    } fi
 }
 
 function main
 {
+    FNONE="\e[0m"
+    FRED="\e[1;31m"
+    FCYAN="\e[1;36m"
+
     CONFIG_FILE="/etc/efistub/stubload.conf"
     CONFIG_DIR="$(dirname $CONFIG_FILE)"
 
-    parse_arg $@
+    parse_arg "$@"
     bool "$VERBOSE" && LOG="/dev/stdout" || LOG="/dev/null"
 
-    for exec in $ARGX; do
+    for exec in ${ARGX[*]}; do
         $exec
     done
 
     exit 0
 }
-main $@
+main "$@"

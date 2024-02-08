@@ -29,14 +29,14 @@ jobs:
     - name: Setup RPM build environment
       run: |
         cd ~/rpmbuild
-        mkdir stubload-0.0.2
-        ln -s stubload-0.0.2 stubload
+        mkdir stubload-0.1.1
+        ln -s stubload-0.1.1 stubload
         mv ~/stubload/stubload.sh ~/stubload/stubload.conf stubload/
         mv ~/stubload/.github/build/rpm/stubload.spec SPECS/
         sudo chmod +x stubload/stubload.sh
         sudo chown -R root:root stubload
         sudo chmod 700 stubload
-        sudo tar -czvf SOURCES/stubload-0.0.2.tgz stubload-0.0.2
+        sudo tar -czvf SOURCES/stubload-0.1.1.tgz stubload-0.1.1
         exit 0
 
     - name: Build RPM package
