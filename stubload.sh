@@ -62,14 +62,14 @@ function sanity_check
 {
     function root_check
     {
-        # id -u == Print current user's UID (root = 0)
+        # id -u -- Print current user's UID (root = 0)
         if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
             eprintln "insufficient permissions"
         } fi
     }
     function uefi_check
     {
-        # /sys/firmware/efi == Kernel interface to EFI variables
+        # /sys/firmware/efi -- Kernel interface to EFI variables
         if ! ( (efibootmgr >/dev/null) && (test -d "/sys/firmware/efi") ); then {
             eprintln "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
         } fi
@@ -93,7 +93,7 @@ function set_debug
 
 function config
 {
-    # '.' == POSIX compatible equivilent to bash's 'source'
+    # '.' -- POSIX compatible equivilent to bash's 'source'
     parse_config
     debug "CONFIG_FILE = $CONFIG_FILE"
     . "$CONFIG_FILE" || eprintln "$CONFIG_FILE: failed to access configuration file."
@@ -141,8 +141,8 @@ function create_entry
         debug "X = $x"
         entry_$x; let x++
 
-        # '//p*' == Remove 'p' & everything after 'p'
-        # '//*p' == Remove 'p' & everything before 'p'
+        # '//p*' -- Remove 'p' & everything after 'p'
+        # '//*p' -- Remove 'p' & everything before 'p'
         PART="$(grep " $BOOT_DIR " /proc/mounts | awk '{print $1}')"
         DISK="${PART//p*}"
         PART_NUM="${PART//*p}"
@@ -172,9 +172,9 @@ function remove_entry
         debug "X = $x"
         entry_$x; let x++
         until ! (entry_exists); do {
-            # -n 1p       == Print first line only
-            # s/ .*//g    == Print first string only
-            # s/[^0-9]//g == Print only numbers
+            # -n 1p       -- Print first line only
+            # s/ .*//g    -- Print first string only
+            # s/[^0-9]//g -- Print only numbers
             FNTARGET="$(grep "$LABEL" <(efibootmgr) | sed -n '1p' | sed 's/ .*//g; s/[^0-9]//g')"
             debug "FNTARGET = $FNTARGET"
             debug "LABEL = $LABEL"
@@ -210,8 +210,8 @@ function version
 
 function parse_arg
 {
-    # 's/-//g'   == Removes all '-' from arguments
-    # 's/./& /g' == Add space between each character
+    # 's/-//g'   -- Removes all '-' from arguments
+    # 's/./& /g' -- Add space between each character
     SHORTARGV=$(
         for ARG in $@; do {
             case "$ARG" in
