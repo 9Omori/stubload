@@ -202,7 +202,7 @@ function list_entry
 
 function version
 {
-    VERSION="0.1.1"
+    VERSION="0.1.2"
     println "stubload version $VERSION"
     println "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
     debug "Build sha1sum: $(sed 's/ .*//g' <(sha1sum <$0))"
