@@ -17,7 +17,7 @@
 
 function bool
 {
-    test "$1" == "true" -o "$1" = '1'
+    ( (test "$1" == "true") || (test "$1" = '1') )
 }
 
 function println
@@ -38,7 +38,7 @@ function eprintln
 
 function execq
 {
-    command -v "$1" &>/dev/null
+    command -v "$1" >/dev/null
 }
 
 function help
@@ -70,7 +70,7 @@ function sanity_check
     function uefi_check
     {
         # /sys/firmware/efi == Kernel interface to EFI variables
-        if ! ( (efibootmgr &>/dev/null) && (test -d "/sys/firmware/efi") ); then {
+        if ! ( (efibootmgr >/dev/null) && (test -d "/sys/firmware/efi") ); then {
             eprintln "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
         } fi
     }
@@ -87,7 +87,7 @@ function set_debug
 {
     function debug
     {
-        fprintln "${FCYAN}debug:${FNONE} $@"
+        println "${FCYAN}debug:${FNONE} $@"
     }
 }
 
@@ -105,23 +105,23 @@ function parse_config
     function label { LABEL="$1" ;}
     function target { TARGET="$1" ;}
     function cmdline { UNICODE="$1" ;}
-    function ramdisk { test "$1" && UNICODE+=" initrd=$1 " ;} 
+    function ramdisk { RAMDISK="\\$1" ;} 
 }
 
 function gain_root
 {
     if (execq "sudo"); then {
-        debug "using sudo"
+        debug "-- s: using sudo"
     } elif (execq "doas"); then {
-        debug "Using doas to elevate privileges"
+        debug "-- s: using doas"
         alias sudo=doas
     } else {
         eprintln "sudo/doas not found"
     } fi
     if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
-        SHORTARGV="$(sed 's/s//' <<<"$SHORTARGV" | tr -d "[:space:]")"
-        debug "SHORTARGV = $SHORTARGV"
-        sudo $0 -"$SHORTARGV"
+        SHORTARGV=( $(sed 's/s//' <<<"${SHORTARGV[@]}" | tr -d "[:space:]") )
+        debug "SHORTARGV = ${SHORTARGV[@]}"
+        sudo $0 -"${SHORTARGV[@]}"
         exit $?
     } fi
 }
@@ -140,13 +140,19 @@ function create_entry
     until ! (execq entry_$x); do {
         debug "X = $x"
         entry_$x; let x++
+
         # '//p*' == Remove 'p' & everything after 'p'
         # '//*p' == Remove 'p' & everything before 'p'
         PART="$(grep " $BOOT_DIR " /proc/mounts | awk '{print $1}')"
         DISK="${PART//p*}"
         PART_NUM="${PART//*p}"
 
-        efibootmgr -c -d "$DISK" -p "$PART_NUM" -L "$LABEL" -l "$TARGET" -u "$UNICODE" | grep "$LABEL" >>$LOG
+        debug "DISK = $DISK"
+        debug "PART_NUM = $PART_NUM"
+        debug "LABEL = $LABEL"
+        debug "TARGET = $TARGET"
+        debug "UNICODE = initrd=$RAMDISK $UNICODE"
+        efibootmgr -c -d "$DISK" -p "$PART_NUM" -L "$LABEL" -l "$TARGET" -u "initrd=$RAMDISK $UNICODE" | grep "$LABEL" >>$LOG
 
         unset "PART" "DISK" "PART_NUM" "UNICODE" "RAMDISK" "CMDLINE" "TARGET"
         if (entry_exists); then {
@@ -188,6 +194,7 @@ function list_entry
 
     let x=1
     until ! (execq entry_$x); do {
+        debug "X = $x"
         entry_$x; let x++
         grep -q " $LABEL" <(efibootmgr) && println "$(($x-1))* $LABEL"
     } done
@@ -198,14 +205,13 @@ function version
     VERSION="0.1.1"
     println "stubload version $VERSION"
     println "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
-    debug "Build sha1sum: $(sha1sum <$0 | sed 's/ .*//g')"
+    debug "Build sha1sum: $(sed 's/ .*//g' <(sha1sum <$0))"
 }
 
 function parse_arg
 {
     # 's/-//g'   == Removes all '-' from arguments
     # 's/./& /g' == Add space between each character
-    #  wc -w     == Count all words
     SHORTARGV=$(
         for ARG in $@; do {
             case "$ARG" in
@@ -214,6 +220,7 @@ function parse_arg
             esac
         } done
     )
+    SHORTARGV=( $SHORTARGV )
 
     LONGARGV=$(
         for ARG in $@; do {
@@ -222,11 +229,9 @@ function parse_arg
             esac
         } done
     )
+    LONGARGV=( $LONGARGV )
 
-    SHORTARGN="$(wc -w <<<"$SHORTARGV")"
-    LONGARGN="$(wc -w <<<"$LONGARGV")"
-
-    for LONGARG in $LONGARGV; do {
+    for LONGARG in ${LONGARGV[@]}; do {
         case "$LONGARG" in
             "force") FORCE_COMPLETE=true ;;
             "debug") set_debug ;;
@@ -234,22 +239,21 @@ function parse_arg
         esac
     } done
 
-    for SHORTARG in $SHORTARGV; do {
+    for SHORTARG in ${SHORTARGV[@]}; do {
         case "$SHORTARG" in
             "v") VERBOSE=true ;;
             "n") DONT_REPEAT=true ;;
-            "s") readonly arg0="gain_root" && ARGX+=" $arg0" ;;
-            "V") readonly arg1="version" && ARGX+=" $arg1 " ;;
-            "h") readonly arg1="help" && ARGX+=" $arg1" ;;
-            "l") readonly arg1="list_entry" && ARGX+=" $arg1" ;;
-            "r") readonly arg1="remove_entry" && ARGX+=" $arg1" ;;
-            "c") readonly arg2="create_entry" && ARGX+=" $arg2" ;;
+            "s") ARGX[0]="gain_root" ;;
+            "V") ARGX[1]="version" ;;
+            "h") ARGX[1]="help" ;;
+            "l") ARGX[1]="list_entry" ;;
+            "r") ARGX[1]="remove_entry" ;;
+            "c") ARGX[2]="create_entry" ;;
             *) eprintln "invalid argument -- $SHORTARG" ;;
         esac
     } done
-    ARGX=( $(sort -n <<<"$ARGX") )
 
-    if ! (test "$ARGX"); then {
+    if (test ${#ARGX[@]} -lt 1); then {
         eprintln "insufficient arguments provided"
     } fi
 }
@@ -266,7 +270,7 @@ function main
     parse_arg "$@"
     bool "$VERBOSE" && LOG="/dev/stdout" || LOG="/dev/null"
 
-    for exec in ${ARGX[*]}; do
+    for exec in ${ARGX[@]}; do
         $exec
     done
 
