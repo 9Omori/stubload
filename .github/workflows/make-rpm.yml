@@ -7,23 +7,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Distrobox
-      run: |
-        sudo apt install -y podman
-        curl -s https://raw.githubusercontent.com/89luca89/distrobox/main/install | sudo sh
-
-    - name: Create Fedora container
-      run: |
-        distrobox-create --yes --name fedora --image fedora
-
     - name: Install dependencies
       run: |
-        distrobox-enter fedora -- sudo dnf makecache
-        distrobox-enter fedora -- sudo dnf install -y rpmdevtools git
+        sudo apt update
+        sudo apt install rpm
      
     - name: Clone repository
       run: |
-        distrobox-enter fedora -- rpmdev-setuptree
+        mkdir -p ~/rpmbuild ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
         git clone https://github.com/9Omori/stubload.git ~/stubload
   
     - name: Setup RPM build environment
