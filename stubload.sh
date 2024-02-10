@@ -25,14 +25,9 @@ function println
     printf "$@\n"
 }
 
-function fprintln
-{
-    println "${0##*/}: $@"
-}
-
 function eprintln
 {
-    fprintln "${FRED}err:${FNONE} $@"
+    println "${FRED}error:${FNONE} $@"
     (bool "$FORCE_COMPLETE") || exit 1
 }
 
@@ -43,7 +38,7 @@ function execq
 
 function help
 {
-    println "Usage: ${0##*/} <-h|-v|-V|-s|-l|-c|-r> [--debug|--force]"
+    println "Usage: $(basename $0) [OPTION]... [ARGUMENT]..."
     println ""
     println " -h   Print help prompt"
     println " -v   Enable verbose output"
@@ -53,8 +48,9 @@ function help
     println " -c   Create boot entries"
     println " -r   Remove boot entries"
     println ""
-    println " --debug   Add extra information for debugging"
-    println " --force   Force continue regardless of warnings/errors"
+    println " --debug          Add extra information for debugging"
+    println " --force          Force continue regardless of warnings/errors"
+    println " --colour[=y/n]   Toggle colour"
     println ""
 }
 
@@ -87,8 +83,23 @@ function set_debug
 {
     function debug
     {
-        println "${FCYAN}debug:${FNONE} $@"
+        println "${FCYAN}(debug):${FNONE} $@"
     }
+}
+
+function colour_on
+{
+    COLOURS_ENABLED=true
+    FNONE="\e[0m"
+    FRED="\e[1;31m"
+    FCYAN="\e[1;36m"
+}
+function colour_off
+{
+    COLOURS_ENABLED=false
+    FNONE="\e[0m"
+    FRED=""
+    FCYAN=""
 }
 
 function config
@@ -111,17 +122,16 @@ function parse_config
 function gain_root
 {
     if (execq "sudo"); then {
-        debug "-- s: using sudo"
+        debug "using sudo"
     } elif (execq "doas"); then {
-        debug "-- s: using doas"
+        debug "using doas"
         alias sudo=doas
     } else {
         eprintln "sudo/doas not found"
     } fi
     if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
         SHORTARGV=( $(sed 's/s//' <<<"${SHORTARGV[@]}" | tr -d "[:space:]") )
-        debug "SHORTARGV = ${SHORTARGV[@]}"
-        sudo $0 -"${SHORTARGV[@]}"
+        sudo $0 -"${SHORTARGV[@]}" $(for LONGARG in ${LONGARGV[@]}; do cat <<<"--$LONGARG"; done)
         exit $?
     } fi
 }
@@ -156,7 +166,7 @@ function create_entry
 
         unset "PART" "DISK" "PART_NUM" "UNICODE" "RAMDISK" "CMDLINE" "TARGET"
         if (entry_exists); then {
-            fprintln "$LABEL: added entry successfully"
+            println "$LABEL: added entry successfully"
         } else {
             eprintln "$LABEL: failed to add entry"
         } fi
@@ -183,7 +193,7 @@ function remove_entry
         if (entry_exists); then {
             eprintln "$LABEL: failed to remove entry"
         } else {
-            fprintln "$LABEL: removed entry"
+            println "$LABEL: removed entry"
         } fi
     } done
 }
@@ -202,7 +212,7 @@ function list_entry
 
 function version
 {
-    VERSION="0.1.2"
+    VERSION="0.1.2-2"
     println "stubload version $VERSION"
     println "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
     debug "Build sha1sum: $(sed 's/ .*//g' <(sha1sum <$0))"
@@ -231,10 +241,13 @@ function parse_arg
     )
     LONGARGV=( $LONGARGV )
 
+    colour_on
     for LONGARG in ${LONGARGV[@]}; do {
         case "$LONGARG" in
             "force") FORCE_COMPLETE=true ;;
             "debug") set_debug ;;
+            "colour=y"|"colour=yes") colour_on ;;
+            "colour=n"|"colour=no") colour_off ;;
             *) eprintln "invalid argument -- $LONGARG" ;;
         esac
     } done
@@ -253,6 +266,9 @@ function parse_arg
         esac
     } done
 
+    debug "LONGARGV = ${LONGARGV[@]}"
+    debug "SHORTARGV = ${SHORTARGV[@]}"
+
     if (test ${#ARGX[@]} -lt 1); then {
         eprintln "insufficient arguments provided"
     } fi
@@ -260,19 +276,15 @@ function parse_arg
 
 function main
 {
-    FNONE="\e[0m"
-    FRED="\e[1;31m"
-    FCYAN="\e[1;36m"
-
     CONFIG_FILE="/etc/efistub/stubload.conf"
     CONFIG_DIR="$(dirname $CONFIG_FILE)"
 
     parse_arg "$@"
     bool "$VERBOSE" && LOG="/dev/stdout" || LOG="/dev/null"
 
-    for exec in ${ARGX[@]}; do
-        $exec
-    done
+    for exec in ${ARGX[@]}; do {
+        "$exec"
+    } done
 
     exit 0
 }

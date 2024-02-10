@@ -7,7 +7,8 @@ BuildArch: noarch
 License: GPL
 Source0: %{name}-%{version}.tgz
 
-Requires: bash efibootmgr
+Requires: bash efibootmgr coreutils grep sed
+Recommends: sudo
 
 %description
 %{summary}
@@ -18,7 +19,6 @@ Requires: bash efibootmgr
 %install
 mkdir -p $RPM_BUILD_ROOT/usr/bin $RPM_BUILD_ROOT/etc/efistub
 cp %{name}.sh $RPM_BUILD_ROOT/usr/bin/%{name}
-test -f "/etc/efistub/stubload.conf" || cp %{name}.conf $RPM_BUILD_ROOT/etc/efistub/
 
 %clean
 rm -rf $RPM_BUILD_ROOT
