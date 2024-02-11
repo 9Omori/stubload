@@ -113,6 +113,7 @@ function colour_off
 {
     COLOURS_ENABLED=false
     FNONE="\e[0m"
+    unset "FRED" "FCYAN" "FYELLOW"
 }
 
 function config
