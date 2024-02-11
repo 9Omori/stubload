@@ -225,7 +225,7 @@ function list_entry
 
 function version
 {
-    MVER="0.1" SVER="2" BVER="2"
+    MVER="0.1" SVER="2" BVER="3"
     VERSION="${MVER}.${SVER}-${BVER}"
     DATE="20:40 10.02.2024"
     println "stubload version $VERSION ($DATE)"
