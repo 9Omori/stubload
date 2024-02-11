@@ -21,10 +21,11 @@ jobs:
       run: |
         mkdir ~/deb/build
         cd ~/deb/build
-        mkdir -p usr/bin etc/efistub
+        mkdir -p usr/bin etc/efistub usr/share/bash-completion/completions
         mkdir DEBIAN
         mv ../source/.github/build/deb/control DEBIAN
         mv ../source/stubload.sh usr/bin/stubload
+        mv ../source/completion.sh usr/share/bash-completion/completions
         sudo chmod +x usr/bin/stubload
         sudo chown -R root:root etc/efistub
         sudo chmod 700 etc/efistub

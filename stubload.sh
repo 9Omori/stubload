@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 # GPLv3
 # Copyright (C) 2024 9Omori (GitHub)
@@ -27,8 +27,16 @@ function println
 
 function eprintln
 {
-    println "${FRED}error:${FNONE} $@"
-    (bool "$FORCE_COMPLETE") || exit 1
+    println "${FRED}error:${FNONE} $1"
+    (test $#2 -ge 1) && EXIT_CODE="$2" || EXIT_CODE="1"
+    (bool "$FORCE_COMPLETE") || exit $EXIT_CODE
+}
+
+function wprintln
+{
+    println "${FYELLOW}warning:${FNONE} $@"
+    (test $#2 -ge 1) && RETURN_CODE="$2" || RETURN_CODE="1"
+    return $RETURN_CODE
 }
 
 function execq
@@ -60,17 +68,23 @@ function sanity_check
     {
         # id -u -- Print current user's UID (root = 0)
         if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
-            eprintln "insufficient permissions"
+            eprintln "insufficient permissions" 77
         } fi
     }
     function uefi_check
     {
         # /sys/firmware/efi -- Kernel interface to EFI variables
         if ! ( (efibootmgr >/dev/null) && (test -d "/sys/firmware/efi") ); then {
-            eprintln "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
+            eprintln "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars" 72
         } fi
     }
-    root_check; uefi_check
+    function configf
+    {
+        if ! (test -f "$CONFIG_FILE"); then {
+            wprintln "$CONFIG_FILE: configuration file is missing" 72
+        } fi
+    }
+    root_check; configf; uefi_check
     (test -d "$CONFIG_DIR") || mkdir -v $CONFIG_DIR
 }
 
@@ -90,16 +104,15 @@ function set_debug
 function colour_on
 {
     COLOURS_ENABLED=true
-    FNONE="\e[0m"
-    FRED="\e[1;31m"
-    FCYAN="\e[1;36m"
+    FNONE="$(tput setaf 7)"
+    FRED="$(tput setaf 1)"
+    FCYAN="$(tput setaf 6)"
+    FYELLOW="$(tput setaf 3)"
 }
 function colour_off
 {
     COLOURS_ENABLED=false
     FNONE="\e[0m"
-    FRED=""
-    FCYAN=""
 }
 
 function config
@@ -107,7 +120,7 @@ function config
     # '.' -- POSIX compatible equivilent to bash's 'source'
     parse_config
     debug "CONFIG_FILE = $CONFIG_FILE"
-    . "$CONFIG_FILE" || eprintln "$CONFIG_FILE: failed to access configuration file."
+    . "$CONFIG_FILE" || eprintln "$CONFIG_FILE: failed to access configuration file" 72
 }
 
 function parse_config
@@ -127,7 +140,7 @@ function gain_root
         debug "using doas"
         alias sudo=doas
     } else {
-        eprintln "sudo/doas not found"
+        eprintln "sudo/doas not found" 127
     } fi
     if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
         SHORTARGV=( $(sed 's/s//' <<<"${SHORTARGV[@]}" | tr -d "[:space:]") )
@@ -212,8 +225,10 @@ function list_entry
 
 function version
 {
-    VERSION="0.1.2-2"
-    println "stubload version $VERSION"
+    MVER="0.1" SVER="2" BVER="2"
+    VERSION="${MVER}.${SVER}-${BVER}"
+    DATE="20:40 10.02.2024"
+    println "stubload version $VERSION ($DATE)"
     println "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
     debug "Build sha1sum: $(sed 's/ .*//g' <(sha1sum <$0))"
 }
@@ -248,7 +263,7 @@ function parse_arg
             "debug") set_debug ;;
             "colour=y"|"colour=yes") colour_on ;;
             "colour=n"|"colour=no") colour_off ;;
-            *) eprintln "invalid argument -- $LONGARG" ;;
+            *) eprintln "invalid argument -- $LONGARG"  ;;
         esac
     } done
 
@@ -262,7 +277,7 @@ function parse_arg
             "l") ARGX[1]="list_entry" ;;
             "r") ARGX[1]="remove_entry" ;;
             "c") ARGX[2]="create_entry" ;;
-            *) eprintln "invalid argument -- $SHORTARG" ;;
+            *) eprintln "invalid argument - $SHORTARG" ;;
         esac
     } done
 
