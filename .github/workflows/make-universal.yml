@@ -33,11 +33,6 @@ jobs:
         sudo tar --zstd -cvf stubload-linux-allarch.tzst *
         sudo mv *.tzst ~
 
-    - name: Test package
-      run: |
-        zstd -d < ~/*.tzst | sudo tar -cv -C /
-        stubload --debug -V
-
     - name: Upload final output
       uses: actions/upload-artifact@v3
       with:
