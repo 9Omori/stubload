@@ -223,9 +223,9 @@ function list_entry
 
 function version
 {
-    MVER="0.1" SVER="2" BVER="3"
+    MVER="0.1" SVER="2" BVER="4"
     VERSION="${MVER}.${SVER}-${BVER}"
-    DATE="20:40 10.02.2024"
+    DATE="21:30 12.02.2024"
     echo "stubload version $VERSION ($DATE)"
     echo "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
     debug "Build sha1sum: $(sed 's/ .*//g' <(sha1sum <$0))"
