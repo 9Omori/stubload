@@ -1,9 +1,9 @@
 # stubload
 
-## What?
-`stubload` is a bash script that interfaces with `efibootmgr` to create a boot entry for the Linux kernel
+### What is it?
+`stubload` utilizes the [EFIStub](https://www.kernel.org/doc/html/latest/admin-guide/efi-stub.html) kernel component
 
-## Why?
+EFIStub allows the user to directly load the kernel from the UEFI
 
 The main goals of `stubload` are:
 
@@ -11,43 +11,53 @@ The main goals of `stubload` are:
 
 * Make using EFIStub easier
 
-## Example usage
+* For the fun of writing scripts
+
+### Example usage
 Create entries:
 
 `# stubload -c`
+
+`# stubload --create`
 
 Create entries & remove previous entries:
 
 `# stubload -cr`
 
+`# stubload --create --remove`
+
 List entries:
 
 `# stubload -l`
 
-## Prerequisites
+`# stubload --list`
+
+### Prerequisites
 
 * A UEFI device
 * `/boot` partition with the FAT filesystem
 * A kernel with EFIStub support
 
-## Installation
+### Installation
 [Releases](https://github.com/9Omori/stubload/releases/latest)
 
 Fedora:
 
-`# dnf install <URL>.rpm`
+`# dnf install *.rpm`
 
 Debian:
 
-`# curl -L <URL>.rpm | dpkg -i`
+`# curl -L *.deb | dpkg -i`
 
 Manual:
 
-`# curl -L <URL>.tzst | zstd -d | tar -x -C /`
+`# curl -L *.tzst | zstd -d | tar -x -C /`
 
-After installation, edit `/etc/efistub/stubload.conf` to properly configure stubload
+After installation, you must create `/etc/efistub/stubload.conf` and fill it out
 
-## Credits
+See [here](https://github.com/9Omori/stubload/blob/main/stubload.conf) to see an example configuration
+
+### Credits
 [efibootmgr](https://github.com/rhboot/efibootmgr)
 
 [Linux](https://www.kernel.org/)

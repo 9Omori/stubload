@@ -1,62 +1,55 @@
 _stubload_completion()
 {
-    local cur
+    local cur cword
     _init_completion || return
 
     LONGARGV=(
+        "--help"
+        "--verbose"
+        "--debug"
+        "--version"
+        "--sudo"
+        "--list"
+        "--create"
+        "--remove"
         "--force"
         "--debug"
-        "--colour="
         "--colour=y"
-        "--colour=yes"
         "--colour=n"
-        "--colour=no"
     )
     SHORTARGV=(
-        "-v"
-        "-n"
-        "-s"
-        "-V"
         "-h"
+        "-v"
+        "-d"
+        "-V"
+        "-s"
         "-l"
-        "-r"
         "-c"
+        "-r"
     )
 
     case "$cur" in
-        "--force"|"--debug"|"--colour=y"|"--colour=yes"|"--colour=n"|"--colour=no")
-            return
-        ;;
-        "-v"|"-n"|"-s"|"-V"|"-h"|"-l"|"-r"|"-c")
-            return
-        ;;
-        "--f"*)
-            RES="${LONGARGV[0]}"
-        ;;
-        "--d"*)
-            RES="${LONGARGV[1]}"
-        ;;
-        "--colour="*)
-            RES=$(cut -d ' ' -f "4-7" <<<"${LONGARGV[@]}")
-        ;;
-        "--c"*)
-            RES=$(cut -d ' ' -f "3-7" <<<"${LONGARGV[@]}")
-        ;;
-        "--"|"--"*)
+        "--"*)
             RES="${LONGARGV[@]}"
         ;;
-        "-")
-            RES="${SHORTARGV[@]} ${LONGARGV[@]}"
+        *"h"*|*"V"*|*"l"*|*"r"*)
+            RES="$cur"
         ;;
         "-"*)
-            RES="$prev"
+            for ARG in $(sed "s/-//g; s/./& /g" <<<"${cur}"); do {
+                SHORTARGV=( $(sed "s/-$ARG//g" <<<"${SHORTARGV[@]}") )
+            } done
+            SHORTARGV=( $(sed "s/-/$cur/g" <<<"${SHORTARGV[@]}") )
+            RES="${SHORTARGV[@]}"
         ;;
         *)
-            RES="${SHORTARGV[@]} ${LONGARGV[@]}"
+            RES="${SHORTARGV[@]}"
         ;;
     esac
 
-    test "$RES" && COMPREPLY=( $(compgen -W "$RES" -- $cur) )
+    if (test "$RES"); then {
+        COMPREPLY=( $(compgen -W "$RES" -- $cur) )
+    } fi
 
     return
 }

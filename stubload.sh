@@ -17,24 +17,20 @@
 
 function bool
 {
+    (test "$1" == "true" || test "$1" = '1')
     ( (test "$1" == "true") || (test "$1" = '1') )
 }
 
-function println
+function err
 {
-    printf "$@\n"
-}
-
-function eprintln
-{
-    println "${FRED}error:${FNONE} $1"
+    echo "${FRED}error:${FNONE} $1"
     (test $#2 -ge 1) && EXIT_CODE="$2" || EXIT_CODE="1"
     (bool "$FORCE_COMPLETE") || exit $EXIT_CODE
 }
 
-function wprintln
+function warn
 {
-    println "${FYELLOW}warning:${FNONE} $@"
+    echo "${FYELLOW}warning:${FNONE} $@"
     (test $#2 -ge 1) && RETURN_CODE="$2" || RETURN_CODE="1"
     return $RETURN_CODE
 }
@@ -46,20 +42,20 @@ function execq
 
 function help
 {
-    println "Usage: $(basename $0) [OPTION]... [ARGUMENT]..."
-    println ""
-    println " -h   Print help prompt"
-    println " -v   Enable verbose output"
-    println " -V   Print current version"
-    println " -s   Gain root permissions by sudo/doas"
-    println " -l   List boot entries"
-    println " -c   Create boot entries"
-    println " -r   Remove boot entries"
-    println ""
-    println " --debug          Add extra information for debugging"
-    println " --force          Force continue regardless of warnings/errors"
-    println " --colour[=y/n]   Toggle colour"
-    println ""
+    echo "Usage: $(basename $0) [OPTION]..."
+    echo ""
+    echo " -h, --help      Print help prompt"
+    echo " -v, --verbose   Enable verbose output"
+    echo " -d, --debug     Add extra information for debugging"
+    echo " -V, --version   Print current version"
+    echo " -s, --sudo      Gain root permissions by sudo/doas"
+    echo " -l, --list      List boot entries"
+    echo " -c, --create    Create boot entries"
+    echo " -r, --remove    Remove boot entries"
+    echo ""
+    echo " --force         Force continue regardless of warnings/errors"
+    echo " --colour[=y/n]  Toggle colour"
+    echo ""
 }
 
 function sanity_check
@@ -68,20 +64,20 @@ function sanity_check
     {
         # id -u -- Print current user's UID (root = 0)
         if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
-            eprintln "insufficient permissions" 77
+            err "insufficient permissions" 77
         } fi
     }
     function uefi_check
     {
         # /sys/firmware/efi -- Kernel interface to EFI variables
         if ! ( (efibootmgr >/dev/null) && (test -d "/sys/firmware/efi") ); then {
-            eprintln "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars" 72
+            err "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars" 72
         } fi
     }
     function configf
     {
         if ! (test -f "$CONFIG_FILE"); then {
-            wprintln "$CONFIG_FILE: configuration file is missing" 72
+            warn "$CONFIG_FILE: configuration file is missing" 72
         } fi
     }
     root_check; configf; uefi_check
@@ -97,7 +93,7 @@ function set_debug
 {
     function debug
     {
-        println "${FCYAN}(debug):${FNONE} $@"
+        echo "${FCYAN}(debug):${FNONE} $@"
     }
 }
 
@@ -121,7 +117,7 @@ function config
     # '.' -- POSIX compatible equivilent to bash's 'source'
     parse_config
     debug "CONFIG_FILE = $CONFIG_FILE"
-    . "$CONFIG_FILE" || eprintln "$CONFIG_FILE: failed to access configuration file" 72
+    . "$CONFIG_FILE" || err "$CONFIG_FILE: failed to access configuration file" 72
 }
 
 function parse_config
@@ -141,11 +137,12 @@ function gain_root
         debug "using doas"
         alias sudo=doas
     } else {
-        eprintln "sudo/doas not found" 127
+        err "sudo/doas not found" 127
     } fi
     if ! ( (test "$(id -u)" = '0') || (test "$USER" == "root") ); then {
-        SHORTARGV=( $(sed 's/s//' <<<"${SHORTARGV[@]}" | tr -d "[:space:]") )
-        sudo $0 -"${SHORTARGV[@]}" $(for LONGARG in ${LONGARGV[@]}; do cat <<<"--$LONGARG"; done)
+        RAWARGV=( $(sed 's/--sudo//g; s/-s/-/g' <<<"${RAWARGV[@]}") )
+        debug "RAWARGV = ${RAWARGV[@]}"
+        sudo $0 "${RAWARGV[@]}"
         exit $?
     } fi
 }
@@ -180,9 +177,9 @@ function create_entry
 
         unset "PART" "DISK" "PART_NUM" "UNICODE" "RAMDISK" "CMDLINE" "TARGET"
         if (entry_exists); then {
-            println "$LABEL: added entry successfully"
+            echo "$LABEL: added entry successfully"
         } else {
-            eprintln "$LABEL: failed to add entry"
+            err "$LABEL: failed to add entry"
         } fi
     } done
 }
@@ -205,9 +202,9 @@ function remove_entry
             (test "$FNTARGET") && efibootmgr -B -b "$FNTARGET" | grep "$LABEL" >>$LOG
         } done
         if (entry_exists); then {
-            eprintln "$LABEL: failed to remove entry"
+            err "$LABEL: failed to remove entry"
         } else {
-            println "$LABEL: removed entry"
+            echo "$LABEL: removed entry"
         } fi
     } done
 }
@@ -220,7 +217,7 @@ function list_entry
     until ! (execq entry_$x); do {
         debug "X = $x"
         entry_$x; let x++
-        grep -q " $LABEL" <(efibootmgr) && println "$(($x-1))* $LABEL"
+        grep -q " $LABEL" <(efibootmgr) && echo "$(($x-1))* $LABEL"
     } done
 }
 
@@ -229,8 +226,8 @@ function version
     MVER="0.1" SVER="2" BVER="3"
     VERSION="${MVER}.${SVER}-${BVER}"
     DATE="20:40 10.02.2024"
-    println "stubload version $VERSION ($DATE)"
-    println "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
+    echo "stubload version $VERSION ($DATE)"
+    echo "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
     debug "Build sha1sum: $(sed 's/ .*//g' <(sha1sum <$0))"
 }
 
@@ -238,55 +235,40 @@ function parse_arg
 {
     # 's/-//g'   -- Removes all '-' from arguments
     # 's/./& /g' -- Add space between each character
-    SHORTARGV=$(
-        for ARG in $@; do {
-            case "$ARG" in
-                "--"*) false ;;
-                "-"*) sed 's/./& /g; s/-//g' <<<"$ARG" ;;
-            esac
-        } done
-    )
-    SHORTARGV=( $SHORTARGV )
 
-    LONGARGV=$(
+    RAWARGV=( $@ )
+    ARGV=$(
         for ARG in $@; do {
             case "$ARG" in
                 "--"*) sed 's/--//g' <<<"$ARG" ;;
+                "-"*) sed 's/./& /g; s/-//g' <<<"$ARG" | xargs ;;
             esac
         } done
     )
-    LONGARGV=( $LONGARGV )
+    ARGV=( $ARGV )
 
     colour_on
-    for LONGARG in ${LONGARGV[@]}; do {
-        case "$LONGARG" in
+    for ARG in ${ARGV[@]}; do {
+        case "$ARG" in
             "force") FORCE_COMPLETE=true ;;
-            "debug") set_debug ;;
-            "colour=y"|"colour=yes") colour_on ;;
+            "verbose"|"v") VERBOSE=true ;;
+            "colour=y"|"colour=yes") true ;;
             "colour=n"|"colour=no") colour_off ;;
-            *) eprintln "invalid argument -- $LONGARG"  ;;
+            "debug"|"d") set_debug ;;
+            "sudo"|"s") ARGX[0]="gain_root" ;;
+            "version"|"V") ARGX[1]="version" ;;
+            "help"|"h") ARGX[1]="help" ;;
+            "list"|"l") ARGX[1]="list_entry" ;;
+            "remove"|"r") ARGX[1]="remove_entry" ;;
+            "create"|"c") ARGX[2]="create_entry" ;;
+            *) err "invalid argument -- $ARG"
         esac
     } done
 
-    for SHORTARG in ${SHORTARGV[@]}; do {
-        case "$SHORTARG" in
-            "v") VERBOSE=true ;;
-            "n") DONT_REPEAT=true ;;
-            "s") ARGX[0]="gain_root" ;;
-            "V") ARGX[1]="version" ;;
-            "h") ARGX[1]="help" ;;
-            "l") ARGX[1]="list_entry" ;;
-            "r") ARGX[1]="remove_entry" ;;
-            "c") ARGX[2]="create_entry" ;;
-            *) eprintln "invalid argument - $SHORTARG" ;;
-        esac
-    } done
-
-    debug "LONGARGV = ${LONGARGV[@]}"
-    debug "SHORTARGV = ${SHORTARGV[@]}"
+    debug "ARGV = ${ARGV[@]}"
 
     if (test ${#ARGX[@]} -lt 1); then {
-        eprintln "insufficient arguments provided"
+        err "insufficient arguments provided"
     } fi
 }
 
@@ -296,7 +278,7 @@ function main
     CONFIG_DIR="$(dirname $CONFIG_FILE)"
 
     parse_arg "$@"
-    bool "$VERBOSE" && LOG="/dev/stdout" || LOG="/dev/null"
+    (bool "$VERBOSE") && LOG="/dev/stdout" || LOG="/dev/null"
 
     for exec in ${ARGX[@]}; do {
         "$exec"
