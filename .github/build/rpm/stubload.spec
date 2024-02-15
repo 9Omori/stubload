@@ -1,5 +1,5 @@
 Name: stubload
-Version: 0.1.3-1
+Version: 0.1.3
 =======
 Version: 0.1.2
 Release: 1%{?dist}
