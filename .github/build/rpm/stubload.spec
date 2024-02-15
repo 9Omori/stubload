@@ -1,6 +1,5 @@
 Name: stubload
 Version: 0.1.3
-Version: 0.1.2
 Release: 1%{?dist}
 Summary: a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel
 BuildArch: noarch
