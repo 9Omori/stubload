@@ -1,17 +1,15 @@
 # stubload
 
 ### What is it?
-`stubload` utilizes the [EFIStub](https://www.kernel.org/doc/html/latest/admin-guide/efi-stub.html) kernel component
+`stubload` is a script that uses the kernel's
+[EFIStub](https://www.kernel.org/doc/html/latest/admin-guide/efi-stub.html) component to create a UEFI entry
+that directly loads the kernel
 
-EFIStub allows the user to directly load the kernel from the UEFI
+By doing this, you allow:
 
-The main goals of `stubload` are:
+* Faster boot times
 
-* Speed up boot times & remove the need for a bootloader
-
-* Make using EFIStub easier
-
-* For the fun of writing scripts
+* Easier use of EFIStub
 
 ### Example usage
 Create entries:
@@ -34,26 +32,21 @@ List entries:
 
 ### Prerequisites
 
-* A UEFI device
-* `/boot` partition with the FAT filesystem
-* A kernel with EFIStub support
+* UEFI device
+* `boot` partition with filesystem type FAT
+* EFIStub supported in kernel
 
 ### Installation
-[Releases](https://github.com/9Omori/stubload/releases/latest)
+Stubload comes packaged in RPM (RedHat),
+DEB (Debian) & TZST (all)
 
-Fedora:
+If you want to request an additional packaging format,
+please create an [Issue](https://github.com/9Omori/stubload/issues)
+with the label 'enhancement'
 
-`# dnf install *.rpm`
-
-Debian:
-
-`# curl -L *.deb | dpkg -i`
-
-Manual:
-
-`# curl -L *.tzst | zstd -d | tar -x -C /`
-
-After installation, you must create `/etc/efistub/stubload.conf` and fill it out
+After installation, you will need a configuration file
+in `/etc/efistub/stubload.conf` for stubload to function
+properly
 
 See [here](https://github.com/9Omori/stubload/blob/main/stubload.conf) to see an example configuration
 
