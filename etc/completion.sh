@@ -32,15 +32,11 @@ _stubload_completion()
         "--"*)
             RES="${LONGARGV[@]}"
         ;;
-        *"h"*|*"V"*|*"l"*|*"r"*)
-            RES="$cur"
+        "-")
+            RES="${SHORTARGV[@]}"
         ;;
         "-"*)
-            for ARG in $(sed "s/-//g; s/./& /g" <<<"${cur}"); do {
-                SHORTARGV=( $(sed "s/-$ARG//g" <<<"${SHORTARGV[@]}") )
-            } done
-            SHORTARGV=( $(sed "s/-/$cur/g" <<<"${SHORTARGV[@]}") )
-            RES="${SHORTARGV[@]}"
+            RES="$cur"
         ;;
         *)
             RES="${SHORTARGV[@]}"

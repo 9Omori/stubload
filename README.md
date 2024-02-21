@@ -40,6 +40,12 @@ List entries:
 Stubload comes packaged in RPM (RedHat),
 DEB (Debian) & TZST (all)
 
+RedHat: `dnf install <package url>`
+
+openSUSE: `rpm -ivh <package url>`
+
+Debian: `dpkg `
+
 If you want to request an additional packaging format,
 please create an [Issue](https://github.com/9Omori/stubload/issues)
 with the label 'enhancement'
