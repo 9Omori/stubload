@@ -16,28 +16,39 @@
 
 set -o posix
 
-echo()
+bool()
 {
-  # 2>&1 -- redirect stderr to stdout
-  cat <<<"$*" 2>&1
+  [ "$1" == "true" ]
 }
 
 die()
 {
   # >&2 -- redirect stdout to stderr
-  cat <<<"${FRED}error:${FNONE} $*" >&2
-  exit 1
+  echo "${fRed}error:${fNone} $*" >&2
+  if [ "${#force}" -gt 1 ]; then
+    return 1
+  else
+    exit 1
+  fi
 }
 
 warn()
 {
-  cat <<<"${FYELLOW}warning:${FNONE} $*" >&2
+  echo "${fYellow}warning:${fNone} $*" >&2
   return 1
 }
 
-bool()
+debug()
 {
-  [ "$1" = "true" ]
+  :
+}
+
+set_debug()
+{
+  debug()
+  {
+    echo "${fCyan}debug:${fNone} $*" >&2
+  }
 }
 
 execq()
@@ -51,9 +62,7 @@ help()
   echo
   echo " -h, --help      print help & exit"
   echo " -v, --verbose   verbose output"
-  echo " -d, --debug     add extra information for debugging"
   echo " -V, --version   print version"
-  echo " -s, --sudo      gain permissions by sudo/doas"
   echo " -l, --list      list entries"
   echo " -c, --create    create entries"
   echo " -r, --remove    remove entries"
@@ -67,118 +76,96 @@ help()
 sanity_check()
 {
   # id -u -- print current user's UID (root = 0)
-  if ! ([ `(id -u)` = '0' ] || [ "$USER" = "root" ]); then {
+  if ! ([ `(id -u)` = '0' ] || [ "$USER" == "root" ]); then
     die "insufficient permissions"
-  } fi
+  fi
 
   # /sys/firmware/efi -- kernel interface to EFI variables
-  if ! ((efibootmgr >/dev/null) && [ -d "/sys/firmware/efi" ]); then {
+  if ! ((efibootmgr >/dev/null) && [ -d "/sys/firmware/efi" ]); then
     die "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
-  } fi
+  fi
   
-  if ! [ -f "$CONFIG_FILE" ]; then {
-    warn "$CONFIG_FILE: configuration file is missing"
-  } fi
+  if ! [ -f "$configFile" ]; then
+    warn "$configFile: configuration file is missing"
+  fi
 
-  [ -d "$CONFIG_DIR" ] || mkdir -v $CONFIG_DIR
-}
-
-debug()
-{
-  return $?
-}
-
-set_debug()
-{
-  debug()
-  {
-    echo "${FCYAN}debug:${FNONE} $*"
-  }
+  [ -d "$configDir" ] || mkdir -v $configDir
 }
 
 colour()
 {
-  FNONE=`(tput setaf 9)`
-
   case "$1" in
     ""|"y"|"yes") {
-      FRED=`(tput setaf 1)`
-      FCYAN=`(tput setaf 6)`
-      FYELLOW=`(tput setaf 3)`
+      fNone=`(echo -e "\e[0m")`
+      fRed=`(echo -e "\e[1;31m")`
+      fCyan=`(echo -e "\e[1;36m")`
+      fYellow=`(echo -e "\e[1;33m")`
     } ;;
     "n"|"no") {
-      unset "FRED" "FCYAN" "FYELLOW"
+      unset fRed fCyan fYellow
     } ;;
     *) {
-      die "invalid value for 'colour' -- ${ARG##colour=}"
+      die "'colour' must be yes/no"
     } ;;
   esac
 }
 
-config()
+run_scripts()
 {
-  dir() { BOOT_DIR="$1" ;}
-  label() { LABEL="$1" ;}
-  target() { TARGET="$1" ;}
-  cmdline() { UNICODE="$1" ;}
-  ramdisk() { RAMDISK="\\${1///}" ;}
-
-  debug "CONFIG_FILE = $CONFIG_FILE"
-
-  # '.' -- POSIX compatible equivilent to bash's 'source'
-  . "$CONFIG_FILE" || die "$CONFIG_FILE: failed to access configuration file"
+  for script in `(ls -d -1 /usr/lib/stubload/scripts/* | grep '\.sh')`; do
+    debug "$script: running script"
+    . "$script" >>$log
+    debug "$script: exited with $?"
+  done
 }
 
-gain_root()
+config()
 {
-  if ((grep -q "SUDO_UID=" <(env)) || [ ${#SUDO} -ge 1 ]); then {
-    return 0
-  } fi
+  dir() { bootDir="$1" ;}
+  label() { label="$1" ;}
+  target() { target="$1" ;}
+  cmdline() { unicode="$1" ;}
+  ramdisk() { ramdisk="\\$1" ;}
 
-  (execq "doas") && SUDO=doas
-  (execq "sudo") && SUDO=sudo
+  debug "configFile = $configFile"
 
-  debug "SUDO = $SUDO"
-
-  if ! [ ${#SUDO} -ge 1 ]; then {
-    die "failed to locate sudo/doas"
-  } fi
-
-  $SUDO $0 "${RAWARGV[@]}"
-  exit $?
+  # '.' -- POSIX compatible equivilent to bash's 'source'
+  . "$configFile" || die "$configFile: failed to access configuration file"
 }
 
 entry_exists()
 {
-  grep -q " $LABEL" <(efibootmgr)
+  grep -q " $label" <(efibootmgr)
 }
 
 create_entry()
 {
   sanity_check; config
-  cd $CONFIG_DIR
+  run_scripts
+  cd $configDir
 
   let x=1
-  until ! (execq entry_$x); do {
+  until ! (execq entry_$x); do
     entry_$x; let x++
 
     # '//p*' -- remove 'p' & everything after 'p'
     # '//*p' -- remove 'p' & everything before 'p'
-    local PART=`(grep " $BOOT_DIR " /proc/mounts | awk '{print $1}')`
-    local DISK=`(sed 's/p.*//' <<<"$PART")`
-    local PART_NUM=`(sed 's/.*p//' <<<"$PART")`
+    local part=`(grep " $bootDir " /proc/mounts | awk '{print $1}')`
+    local disk=`(sed 's/p.*//' <<<"$part")`
+    local partNum=`(sed 's/.*p//' <<<"$part")`
 
-    debug "DISK = $DISK"
-    debug "PART_NUM = $PART_NUM"
-    debug "UNICODE = initrd=$RAMDISK $UNICODE"
-    efibootmgr -c -d "$DISK" -p "$PART_NUM" -L "$LABEL" -l "$TARGET" -u "initrd=$RAMDISK $UNICODE" | grep "$LABEL" >>$LOG
+    debug "disk = $disk"
+    debug "partNum = $partNum"
+    debug "unicode = $unicode"
 
-    if (entry_exists); then {
-      echo "$LABEL: added entry successfully"
-    } else {
-      die "$LABEL: failed to add entry"
-    } fi
-  } done
+    efibootmgr -c -d "$disk" -p "$partNum" -L "$label" -l "$target" -u "initrd=$ramdisk $unicode" | grep "$label" >>$log
+
+    if (entry_exists); then
+      echo "$label: added entry successfully"
+    else
+      die "$label: failed to add entry"
+    fi
+  done
 }
 
 remove_entry()
@@ -186,23 +173,25 @@ remove_entry()
   sanity_check; config
 
   let x=1
-  until ! (execq entry_$x); do {
+  until ! (execq entry_$x); do
     entry_$x; let x++
-    until ! (entry_exists); do {
+    until ! (entry_exists); do
       # -n 1p       -- print first line only
       # s/ .*//g    -- print first string only
       # s/[^0-9]//g -- print only numbers
-      FNTARGET=`(grep "$LABEL" <(efibootmgr) | sed -n '1p' | sed 's/ .*//g; s/[^0-9]//g')`
-      debug "FNTARGET = $FNTARGET"
-      debug "LABEL = $LABEL"
-      [ "${#FNTARGET}" -ge 1 ] && efibootmgr -B -b "$FNTARGET" | grep "$LABEL" >>$LOG
-    } done
-    if (entry_exists); then {
-      die "$LABEL: failed to remove entry"
-    } else {
-      echo "$LABEL: removed entry"
-    } fi
-  } done
+      fnTarget=`(grep "$label" <(efibootmgr) | sed -n '1p' | sed 's/ .*//g; s/[^0-9]//g')`
+
+      debug "fnTarget = $fnTarget"
+      debug "label = $label"
+
+      [ "${#fnTarget}" -lt '1' ] || efibootmgr -B -b "$fnTarget" | grep "$label" >>$log
+    done
+    if (entry_exists); then
+      die "$label: failed to remove entry"
+    else
+      echo "$label: removed entry"
+    fi
+  done
 }
 
 list_entry()
@@ -210,19 +199,19 @@ list_entry()
   sanity_check; config
 
   let x=1
-  until ! (execq entry_$x); do {
+  until ! (execq entry_$x); do
     entry_$x; let x++
-    (entry_exists) && echo "$(($x-1))* $LABEL"
-  } done
+    (entry_exists) && echo "$(($x-1))* $label"
+  done
 }
 
 version()
 {
-  MVER="0.1" SVER="3" BVER="2"
-  VERSION="${MVER}.${SVER}-${BVER}"
-  DATE="09:50 21/02/2024"
-  TZ="GMT"
-  echo "stubload version $VERSION ($DATE [$TZ])"
+  mVer="0.1" sVer="3" bVer="3"
+  version="${mVer}.${sVer}-${bVer}"
+  date="23:52 25/02/2024"
+  tz="GMT"
+  echo "stubload version $version ($date [$tz])"
   echo "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
   debug "Build sha1sum: `sed 's/ .*//g' <(sha1sum <$0)`"
   exit 0
@@ -232,33 +221,31 @@ parse_arg()
 {
   RAWARGV=( $* )
   ARGV=(`
-    for ARG in $*; do {
+    for ARG in $*; do
       # 's/xyz//g' -- remove 'xyz' from input
       # 's/./& /g' -- add space between each character
       case "$ARG" in
         "--"*) sed 's/--//g' <<<"$ARG" ;;
         "-"*) sed 's/./& /g; s/-//g' <<<"$ARG" | xargs ;;
       esac
-    } done
+    done
   `)
 
   argx()
   {
-    if [ ${#ARGX[$1]} -ge 1 ]; then {
+    if [ ${#ARGX[$1]} -ge 1 ]; then
       die "conflicting arguments provided"
-    } else {
+    else
       ARGX[$1]="$2"
-    } fi
+    fi
   }
 
   colour
-  for ARG in ${ARGV[@]}; do {
+  for ARG in ${ARGV[@]}; do
     case "$ARG" in
-      "force") FORCE_COMPLETE=true ;;
-      "verbose"|"v") VERBOSE=true ;;
-      "colour"*) colour `sed 's/colour//; s/=//' <<<"$ARG"` ;;
-      "debug"|"d") set_debug ;;
-      "sudo"|"s") argx 0 "gain_root" ;;
+      "force") force=true ;;
+      "verbose"|"v") set_debug; verbose=true ;;
+      "colour"*) colour `(sed 's/colour//; s/=//' <<<"$ARG")` ;;
       "version"|"V") argx 1 "version" ;;
       "help"|"h") argx 1 "help" ;;
       "list"|"l") argx 1 "list_entry" ;;
@@ -266,27 +253,27 @@ parse_arg()
       "create"|"c") argx 2 "create_entry" ;;
       *) die "invalid argument -- $ARG"
     esac
-  } done
+  done
 
   debug "ARGV = ${ARGV[@]}"
 
-  if [ '1' -gt ${#ARGX[@]} ]; then {
-    die "must provide at least one of '-h'|'-V'|'-l'|'-c'|'-r'"
-  } fi
+  if [ "${#ARGX[@]}" -lt '1' ]; then
+    die "insufficient arguments provided"
+  fi
 }
 
-main()
+stubload()
 {
-  CONFIG_FILE="/etc/efistub/stubload.conf"
-  CONFIG_DIR=`dirname $CONFIG_FILE`
+  configFile="/etc/efistub/stubload.conf"
+  configDir=`(dirname $configFile)`
 
   parse_arg "$*"
-  (bool "$VERBOSE") && LOG="/dev/stdout" || LOG="/dev/null"
+  (bool "$verbose") && log="/dev/stdout" || log="/dev/null"
 
-  for exec in ${ARGX[@]}; do {
+  for exec in ${ARGX[@]}; do
     $exec
-  } done
+  done
 
   exit 0
 }
-main "$*"
+stubload "$*"

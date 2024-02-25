@@ -17,7 +17,10 @@ Recommends: sudo
 %setup -q
 
 %install
-mkdir -p $RPM_BUILD_ROOT/usr/bin $RPM_BUILD_ROOT/etc/efistub $RPM_BUILD_ROOT/usr/share/bash-completion/completions
+mkdir -p $RPM_BUILD_ROOT/usr/bin
+mkdir -p $RPM_BUILD_ROOT/etc/efistub
+mkdir -p $RPM_BUILD_ROOT/usr/share/bash-completion/completions
+mkdir -p $RPM_BUILD_ROOT/lib/stubload/scripts
 cp %{name}.sh $RPM_BUILD_ROOT/usr/bin/%{name}
 cp completion.sh $RPM_BUILD_ROOT/usr/share/bash-completion/completions/%{name}
 

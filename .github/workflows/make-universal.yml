@@ -20,9 +20,9 @@ jobs:
     - name: Create structure
       run: |
         cd ~/source
-        mkdir -p usr/bin etc/efistub usr/share/bash-completion/completions
+        mkdir -p usr/bin etc/efistub usr/share/bash-completion/completions lib/stubload/scripts
         mv bin/stubload.sh usr/bin/stubload
-        mv etc/completion.sh usr/share/bash-completion/completions
+        mv etc/completion.sh usr/share/bash-completion/completions/stubload
         sudo chmod +x usr/bin/stubload
         sudo chown -R root:root etc/efistub
         sudo chmod 700 etc/efistub

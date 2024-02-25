@@ -44,11 +44,16 @@ RedHat: `dnf install <package url>`
 
 openSUSE: `rpm -ivh <package url>`
 
-Debian: `dpkg `
+Debian: `curl -LO <package url>; dpkg -i <package name>`
 
 If you want to request an additional packaging format,
 please create an [Issue](https://github.com/9Omori/stubload/issues)
 with the label 'enhancement'
+
+I do plan to add an Arch package sometime in the
+near future, if anyone would like to help with
+making the 'PKGBUILD', then also please create
+an issue
 
 After installation, you will need a configuration file
 in `/etc/efistub/stubload.conf` for stubload to function
