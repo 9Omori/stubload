@@ -1,6 +1,7 @@
 name: Debian package
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:

@@ -1,6 +1,7 @@
 name: RedHat package
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:
