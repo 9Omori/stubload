@@ -1,5 +1,6 @@
 v0.1.3:
 + Improve argument parsing method (again) & general code
++ Add script functionality
 + Remove sudo option
 + Merge 'verbose' & 'debug' options
 + Fix wrong `tput` command causing colour to not change back to default
