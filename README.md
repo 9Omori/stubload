@@ -5,7 +5,7 @@
 [EFIStub](https://www.kernel.org/doc/html/latest/admin-guide/efi-stub.html) component to create a UEFI entry
 that directly loads the kernel
 
-By doing this, you allow:
+Doing this allows for:
 
 * Faster boot times
 
@@ -47,7 +47,7 @@ openSUSE: `rpm -ivh <package url>`
 Debian: `curl -LO <package url>; dpkg -i <package name>`
 
 If you want to request an additional packaging format,
-please create an [Issue](https://github.com/9Omori/stubload/issues)
+please create an [issue](https://github.com/9Omori/stubload/issues)
 with the label 'enhancement'
 
 I do plan to add an Arch package sometime in the
@@ -59,7 +59,7 @@ After installation, you will need a configuration file
 in `/etc/efistub/stubload.conf` for stubload to function
 properly
 
-See [here](https://github.com/9Omori/stubload/blob/main/stubload.conf) to see an example configuration
+See [here](https://github.com/9Omori/stubload/blob/main/etc/stubload.conf) for an example configuration
 
 ### Credits
 [efibootmgr](https://github.com/rhboot/efibootmgr)
