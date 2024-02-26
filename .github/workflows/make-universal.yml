@@ -2,6 +2,10 @@ name: Universal package
 
 on:
   push:
+    paths:
+      - 'bin/stubload.sh'
+      - 'etc/completion.sh'
+      - 'etc/efistub/stubload.conf'
   workflow_dispatch:
 
 jobs:
