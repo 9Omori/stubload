@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
 
-# Copyright (C) 2024 9Omori (GitHub)
-#
-# stubload is free software; you can redistribute it and/or modify it
-# under the terms of the GNU General Public License version 3
-# as published by the Free Software Foundation.
-#
-# stubload is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with stubload; if not, see <http://www.gnu.org/licenses/>.
-
-set -o posix
+base()
+{
+  for start in $*; do
+    $start
+  done
+}
 
 bool()
 {
@@ -23,66 +14,83 @@ bool()
 
 die()
 {
+  local red="\e[1;31m"
+
   # >&2 -- redirect stdout to stderr
-  echo "${fRed}error:${fNone} $*" >&2
-  if [ "${#force}" -gt 1 ]; then
-    return 1
-  else
-    exit 1
-  fi
+  echo -e "${red}error:${no_colour} $1" >&2; shift
+  [ $# -ge 1 ] && echo -e "$*" >&2
+
+  [ "${#force}" -gt 1 ] && return 1
+  exit 1
 }
 
 warn()
 {
-  echo "${fYellow}warning:${fNone} $*" >&2
+  local yellow="\e[1;33m"
+
+  echo -e "${yellow}warning:${no_colour} $*" >&2
   return 1
 }
 
 debug()
 {
-  :
+  return
 }
 
 set_debug()
 {
   debug()
   {
-    echo "${fCyan}debug:${fNone} $*" >&2
+    local cyan="\e[1;36m"
+
+    echo -e "${cyan}debug:${no_colour} $*" >&2
   }
 }
 
-execq()
+find_exec()
 {
-  command -v "$1" >/dev/null
+  eval \
+    command -v "$1" >/dev/null
 }
 
 help()
 {
   echo "Usage: `(basename $0)` [OPTION]..."
   echo
-  echo " -h, --help      print help & exit"
-  echo " -v, --verbose   verbose output"
-  echo " -V, --version   print version"
-  echo " -l, --list      list entries"
-  echo " -c, --create    create entries"
-  echo " -r, --remove    remove entries"
+  echo " -h, --help         print help & exit"
+  echo " -v, --verbose      verbose output"
+  echo " -V, --version      print version"
+  echo " -n, --number [#]   specify boot # to target"
+  echo " -l, --list         list entries"
+  echo " -c, --create       create entries"
+  echo " -r, --remove       remove entries"
   echo
-  echo " --force         continue & ignore errors"
-  echo " --colour[=y/n]  toggle colour output"
+  echo " --force            continue & ignore errors"
+  echo " --config[=file]    use custom configuration file"
   echo
   exit 0
+}
+
+usage()
+{
+  echo "Usage: `(basename $0)`"
+  echo "       [-h|--help] [-v|--verbose] [-V|--version]"
+  echo "       [-n|--number <number>] [-l|--list] [-c|--create]"
+  echo "       [-r|--remove] [--force] [--config<=file>]"
+  exit 1
 }
 
 sanity_check()
 {
   # id -u -- print current user's UID (root = 0)
-  if ! ([ `(id -u)` = '0' ] || [ "$USER" == "root" ]); then
+  if ! ( [ `(id -u)` = '0' ] || [ "$USER" == "root" ] ); then
     die "insufficient permissions"
   fi
 
   # /sys/firmware/efi -- kernel interface to EFI variables
-  if ! ((efibootmgr >/dev/null) && [ -d "/sys/firmware/efi" ]); then
-    die "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
+  if ! ( (efibootmgr >/dev/null) && [ -d "/sys/firmware/efi" ] ); then
+    die \
+    "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
   fi
   
   if ! [ -f "$configFile" ]; then
@@ -94,20 +102,10 @@ sanity_check()
 
 colour()
 {
-  case "$1" in
-    ""|"y"|"yes") {
-      fNone=`(echo -e "\e[0m")`
-      fRed=`(echo -e "\e[1;31m")`
-      fCyan=`(echo -e "\e[1;36m")`
-      fYellow=`(echo -e "\e[1;33m")`
-    } ;;
-    "n"|"no") {
-      unset fRed fCyan fYellow
-    } ;;
-    *) {
-      die "'colour' must be yes/no"
-    } ;;
-  esac
+  fNone="\e[0m"
+  fRed="\e[1;31m"
+  fCyan="\e[1;36m"
+  fYellow="\e[1;33m"
 }
 
 run_scripts()
@@ -121,6 +119,11 @@ run_scripts()
 
 config()
 {
+  if [ "${#1}" -ge 1 ]; then
+    base sanity_check
+    configFile="$1"
+  fi
+
   dir() { bootDir="$1" ;}
   label() { label="$1" ;}
   target() { target="$1" ;}
@@ -140,19 +143,38 @@ entry_exists()
 
 create_entry()
 {
-  sanity_check; config
-  run_scripts
+  base sanity_check config run_scripts
   cd $configDir
 
-  let x=1
-  until ! (execq entry_$x); do
-    entry_$x; let x++
+  _create()
+  {
+    entry_$x
 
-    # '//p*' -- remove 'p' & everything after 'p'
-    # '//*p' -- remove 'p' & everything before 'p'
+    if (entry_exists) && ! (bool "$force"); then
+      die \
+        "$label: entry already exists" \
+        "use '--force' to ignore"
+    fi
+
     local part=`(grep " $bootDir " /proc/mounts | awk '{print $1}')`
-    local disk=`(sed 's/p.*//' <<<"$part")`
-    local partNum=`(sed 's/.*p//' <<<"$part")`
+
+    case "$part" in
+      "/dev/nvme"*|"/dev/mmcblk"*)
+        # 's/p.*//' -- remove 'p' & everything after 'p'
+        # 's/.*p//' -- remove 'p' & everything before 'p'
+        local disk=`(sed 's/p.*//' <<<"$part")`
+        local partNum=`(sed 's/.*p//' <<<"$part")`
+        ;;
+      "/dev/sd"*)
+        # 's/[^0-9]//g' -- remove all non-numbers
+        local disk=`(sed 's/sd.*//' <<<"$part")`
+        local partNum=`(sed 's/[^0-9]//g' <<<"$part")`
+        ;;
+      *)
+        die \
+          "$part: unrecognised disk mapping"
+        ;;
+    esac
 
     debug "disk = $disk"
     debug "partNum = $partNum"
@@ -161,20 +183,33 @@ create_entry()
     efibootmgr -c -d "$disk" -p "$partNum" -L "$label" -l "$target" -u "initrd=$ramdisk $unicode" | grep "$label" >>$log
 
     if (entry_exists); then
-      echo "$label: added entry successfully"
+      echo "$label: added entry"
     else
       die "$label: failed to add entry"
     fi
-  done
+  }
+
+  if [ "${#NUMARGV[@]}" -ge 1 ]; then
+    for x in ${NUMARGV[@]}; do
+      _create
+    done
+  else
+    let x=1
+    until ! (find_exec entry_$x); do
+      _create
+      let x++
+    done
+  fi
 }
 
 remove_entry()
 {
-  sanity_check; config
+  base sanity_check config
 
-  let x=1
-  until ! (execq entry_$x); do
-    entry_$x; let x++
+  _remove()
+  {
+    entry_$x
+
     until ! (entry_exists); do
       # -n 1p       -- print first line only
       # s/ .*//g    -- print first string only
@@ -186,42 +221,76 @@ remove_entry()
 
       [ "${#fnTarget}" -lt '1' ] || efibootmgr -B -b "$fnTarget" | grep "$label" >>$log
     done
+
     if (entry_exists); then
       die "$label: failed to remove entry"
     else
       echo "$label: removed entry"
     fi
-  done
+  }
+
+  if [ "${#NUMARGV[@]}" -ge 1 ]; then
+    for x in ${NUMARGV[@]}; do
+      _remove
+    done
+  else
+    let x=1
+    until ! (find_exec entry_$x); do
+      _remove
+      let x++
+    done
+  fi
 }
 
 list_entry()
 {
-  sanity_check; config
+  base sanity_check config
 
-  let x=1
-  until ! (execq entry_$x); do
-    entry_$x; let x++
-    (entry_exists) && echo "$(($x-1))* $label"
-  done
+  _list()
+  {
+    entry_$x
+
+    num=`(efibootmgr | grep "$label" | sed -n '1p' | sed 's/Boot//; s/*.*//')`
+    if (entry_exists); then
+      echo "$num|$x $label "
+    else
+      debug "$label: entry does not exist"
+    fi
+  }
+
+  if [ "${#NUMARGV[@]}" -ge 1 ]; then
+    for x in ${NUMARGV[@]}; do
+      _list
+    done
+  else
+    let x=1
+    until ! (find_exec entry_$x); do
+      _list
+      let x++
+    done
+  fi
 }
 
 version()
 {
-  mVer="0.1" sVer="3" bVer="3"
-  version="${mVer}.${sVer}-${bVer}"
-  date="23:52 25/02/2024"
-  tz="GMT"
-  echo "stubload version $version ($date [$tz])"
-  echo "Licensed under the GPLv3 <https://www.gnu.org/licenses/>"
-  debug "Build sha1sum: `sed 's/ .*//g' <(sha1sum <$0)`"
+  VERSION="0.1.3-4"
+  VERSION_CODE=9
+  TIME="00:05"
+  DATE="29/02/2024"
+  TZONE="GMT"
+  LICENSE="GPLv3"
+
+  echo "stubload version $VERSION ($TIME $DATE [$TZONE])"
+  echo "Licensed under the $LICENSE <https://www.gnu.org/licenses/>"
+  debug "Build sha1sum: `(sed 's/ .*//g' <(sha1sum <$0))`"
   exit 0
 }
 
 parse_arg()
 {
-  RAWARGV=( $* )
+  RAWARGV=( $@ )
   ARGV=(`
-    for ARG in $*; do
+    for ARG in $@; do
       # 's/xyz//g' -- remove 'xyz' from input
       # 's/./& /g' -- add space between each character
       case "$ARG" in
@@ -230,6 +299,23 @@ parse_arg()
       esac
     done
   `)
+
+  parse_narg()
+  {
+    NUMARGV=(`
+      for ARG in $*; do
+        if (grep -qE '^[0-9]+$' <<<"$ARG"); then
+          printf "$ARG "
+        fi
+      done
+    `)
+
+    debug "NUMARGV = ${NUMARGV[@]}"
+
+    if [ "${#NUMARGV[@]}" -lt 1 ]; then
+      die "must provide at least 1 number"
+    fi
+  }
 
   argx()
   {
@@ -240,14 +326,15 @@ parse_arg()
     fi
   }
 
-  colour
   for ARG in ${ARGV[@]}; do
     case "$ARG" in
       "force") force=true ;;
+      "config="*) config `(sed 's/config=//' <<<"$ARG")` ;;
       "verbose"|"v") set_debug; verbose=true ;;
-      "colour"*) colour `(sed 's/colour//; s/=//' <<<"$ARG")` ;;
       "version"|"V") argx 1 "version" ;;
       "help"|"h") argx 1 "help" ;;
+      "number"|"n") parse_narg $@ ;;
+      "n"*) parse_narg `(sed 's/n//' <<<"$ARG")` $@ ;;
       "list"|"l") argx 1 "list_entry" ;;
       "remove"|"r") argx 1 "remove_entry" ;;
       "create"|"c") argx 2 "create_entry" ;;
@@ -258,22 +345,22 @@ parse_arg()
   debug "ARGV = ${ARGV[@]}"
 
   if [ "${#ARGX[@]}" -lt '1' ]; then
-    die "insufficient arguments provided"
+    die \
+      "insufficient arguments provided" \
+      "try '`(basename $0)` -h' for more info"
   fi
 }
 
-stubload()
-{
-  configFile="/etc/efistub/stubload.conf"
-  configDir=`(dirname $configFile)`
+configFile="/etc/efistub/stubload.conf"
+configDir=`(dirname $configFile)`
 
-  parse_arg "$*"
-  (bool "$verbose") && log="/dev/stdout" || log="/dev/null"
+no_colour="\e[0m"
 
-  for exec in ${ARGX[@]}; do
-    $exec
-  done
+parse_arg "$@"
+(bool "$verbose") && log="/dev/stdout" || log="/dev/null"
 
-  exit 0
-}
-stubload "$*"
+for exec in ${ARGX[@]}; do
+  $exec
+done
+
+exit 0
