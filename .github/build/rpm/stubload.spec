@@ -7,7 +7,7 @@ BuildArch: noarch
 License: GPL
 Source0: %{name}-%{version}.tgz
 
-Requires: bash efibootmgr coreutils grep sed ncurses
+Requires: bash efibootmgr coreutils grep ncurses
 Recommends: sudo
 
 %description

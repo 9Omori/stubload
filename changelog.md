@@ -8,6 +8,7 @@ v0.1.3:
 + Add support for sd* disk mapping
 + Add entry number selection option
 + Add configuration file chooser
++ Remove debugging
 
 v0.1.2:
 + Fix & improve argument parsing method
