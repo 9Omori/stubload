@@ -38,6 +38,7 @@ jobs:
 
     - name: Setup environment
       run: |
+        mkdir ~/deb/build
         cd ~/deb/build
 
         mkdir -p \
@@ -54,6 +55,7 @@ jobs:
         sudo chown -R root:root etc/efistub
         sudo chmod 700 etc/efistub
 
+        mkdir ~/rpmbuild
         cd ~/rpmbuild
         
         mkdir stubload-${{ matrix.version }}
@@ -67,6 +69,7 @@ jobs:
 
         sudo tar -czvf SOURCES/stubload-${{ matrix.version }}.tgzt stubload-${{ matrix.version }}
 
+        mkdir ~/tar
         cd ~/tar
 
         mkdir -p \
