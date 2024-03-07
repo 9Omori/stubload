@@ -6,6 +6,7 @@ on:
       - 'bin/stubload.sh'
       - 'etc/completion.sh'
       - 'etc/stubload.conf'
+      - '.github/workflows/make-pkg.yml'
   workflow_dispatch:
 
 jobs:
@@ -20,8 +21,8 @@ jobs:
 
     - name: Setup structure
       run: |
-        mkdir -p \
-          ~/deb \
+        mkdir -pv \
+          ~/deb/build \
           ~/rpmbuild ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} \
           ~/tar
 
@@ -38,30 +39,28 @@ jobs:
 
     - name: Setup environment
       run: |
-        mkdir ~/deb/build
         cd ~/deb/build
 
-        mkdir -p \
+        mkdir -pv \
           usr/bin \
           etc/efistub \
           usr/share/bash-completions/completions \
           lib/stubload/scripts
 
-        mv ~/source/.github/build/deb/control DEBIAN
-        cp ~/source/bin/stubload.sh usr/bin/stubload
-        cp ~/source/etc/completion.sh usr/share/bash-completions/completions/stubload
+        mv -v ~/source/.github/build/deb/control DEBIAN
+        cp -v ~/source/bin/stubload.sh usr/bin/stubload
+        cp -v ~/source/etc/completion.sh usr/share/bash-completions/completions/stubload
 
         sudo chmod +x usr/bin/stubload
         sudo chown -R root:root etc/efistub
         sudo chmod 700 etc/efistub
 
-        mkdir ~/rpmbuild
         cd ~/rpmbuild
         
-        mkdir stubload-${{ matrix.version }}
+        mkdir -v stubload-${{ matrix.version }}
         ln -s stubload-${{ matrix.version }} stubload
-        mv ~/source/.github/build/rpm/stubload.spec SPECS/
-        cp ~/source/bin/stubload.sh ~/source/etc/completion.sh stubload/
+        mv -v ~/source/.github/build/rpm/stubload.spec SPECS/
+        cp -v ~/source/bin/stubload.sh ~/source/etc/completion.sh stubload/
         
         sudo chmod +x stubload/stubload.sh
         sudo chown -R root:root stubload
@@ -69,34 +68,33 @@ jobs:
 
         sudo tar -czvf SOURCES/stubload-${{ matrix.version }}.tgzt stubload-${{ matrix.version }}
 
-        mkdir ~/tar
         cd ~/tar
 
-        mkdir -p \
+        mkdir -pv \
           usr/bin \
           etc/efistub \
           usr/share/bash-completion/completions \
           lib/stubload/scripts
         
-        cp ~/source/bin/stubload.sh usr/bin/stubload
-        cp ~/source/etc/completion.sh usr/share/bash-completion/completions/stubload
+        cp -v ~/source/bin/stubload.sh usr/bin/stubload
+        cp -v ~/source/etc/completion.sh usr/share/bash-completion/completions/stubload
 
         sudo chmod +x usr/bin/stubload
         sudo chown -R root:root etc/efistub
         sudo chmod 700 etc/efistub
         
-        rm -rf $(ls -A | sed 's/usr//; s/etc//')
+        rm -rfv $(ls -A | sed 's/usr//; s/etc//')
 
     - name: Build package
       run: |
         cd ~/deb/build
         sudo dpkg-deb --root-owner-group --build $(pwd)
         sudo chown $USER ../*.deb
-        mv ../*.deb ~/stubload-${{ matrix.full-version }}.allarch.deb
+        mv -v ../*.deb ~/stubload-${{ matrix.full-version }}.allarch.deb
 
         cd ~/rpmbuild
         rpmbuild -bb SPECS/stubload.spec
-        mv RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.tzst
+        mv -v RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.tzst
 
         cd ~/tar
         sudo tar --zstd -cvf stubload.tzst *
