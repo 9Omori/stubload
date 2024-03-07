@@ -49,7 +49,7 @@ jobs:
 
         mv ~/source/.github/build/deb/control DEBIAN
         cp ~/source/bin/stubload.sh usr/bin/stubload
-        cp ~/source/etc/completion.sh usr/share/bash-completion/completions/stubload
+        cp ~/source/etc/completion.sh usr/share/bash-completions/completions/stubload
 
         sudo chmod +x usr/bin/stubload
         sudo chown -R root:root etc/efistub
