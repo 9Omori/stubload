@@ -101,8 +101,20 @@ jobs:
         sudo tar --zstd -cvf stubload.tzst *
         sudo mv -v *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
 
-    - name: Upload packages
+    - name: Upload DEB
       uses: actions/upload-artifact@v4
       with:
-        name: out
-        path: ~/*.deb ~/*.rpm ~/*.tzst
+        name: deb-out
+        path: ~/*.deb
+    
+    - name: Upload RPM
+      uses: actions/upload-artifact@v4
+      with:
+        name: rpm-out
+        path: ~/*.rpm
+
+    - name: Upload TZST
+      uses: actions/upload-artifact@v4
+      with:
+        name: tar-out
+        path: ~/*.tzst
