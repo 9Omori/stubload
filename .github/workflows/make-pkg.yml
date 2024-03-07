@@ -95,11 +95,11 @@ jobs:
 
         cd ~/rpmbuild
         rpmbuild -bb SPECS/stubload.spec
-        mv -v RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.tzst
+        mv -v ~/rpmbuild/RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.tzst
 
         cd ~/tar
-        sudo tar --zstd -cvf stubload.tzst *
-        sudo mv *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
+        tar --zstd -cvf stubload.tzst *
+        mv -v *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
 
     - name: Upload DEB
       uses: actions/upload-artifact@v4
