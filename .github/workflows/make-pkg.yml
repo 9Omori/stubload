@@ -67,7 +67,7 @@ jobs:
         sudo chown -R root:root stubload
         sudo chmod 700 stubload
 
-        sudo tar -czvf SOURCES/stubload-${{ matrix.version }}.tgzt stubload-${{ matrix.version }}
+        sudo tar -czvf SOURCES/stubload-${{ matrix.version }}.tgz stubload-${{ matrix.version }}
 
         cd ~/tar
 
