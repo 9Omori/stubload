@@ -42,12 +42,13 @@ jobs:
         cd ~/deb/build
 
         mkdir -pv \
+          DEBIAN \
           usr/bin \
           etc/efistub \
           usr/share/bash-completions/completions \
           lib/stubload/scripts
 
-        mv -v ~/source/.github/build/deb/control DEBIAN
+        mv -v ~/source/.github/build/deb/control DEBIAN/control
         cp -v ~/source/bin/stubload.sh usr/bin/stubload
         cp -v ~/source/etc/completion.sh usr/share/bash-completions/completions/stubload
 
