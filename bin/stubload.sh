@@ -1,71 +1,85 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-VERSION="0.1.3-5"
-VERSION_CODE=11
-TIME="17:46"
-DATE="04/03/2024"
-TZONE="GMT"
+VERSION="0.1.3-6"
+VERSION_CODE=12
+TIME="22:02"
+DATE="07/03/2024"
+TZONE="gmt"
 
-EVERSION=`(efibootmgr -V)` EVERSION="${EVERSION//* }"
+EVERSION=$(efibootmgr -V) EVERSION="${EVERSION//* }"
 
 die()
 {
   # \e[1;31m -- change output to red
   # \e[0m -- change output to default
   # >&2 -- redirect stdout to stderr
-  echo $'\e[1;31m'"error:"$'\e[0m' "$*" >&2
+  echo $'\e[1;31m'"error:" $'\e[0m'"$1" >&2
+  shift
+
+  while (($#)); do
+    echo "$1" >&2
+    shift
+  done
 
   (($force)) && return 1
   exit 1
 }
 
-base()
+execq()
 {
-  for base in $*; do
-    eval "$base"
-  done
+  eval command -v "$1" >$void
 }
 
-find_exec()
+sub()
 {
-  eval \
-    command -v "$1" >$null
+  if ((${#NUMARGV[@]})); then
+    for x in ${NUMARGV[@]}; do
+      eval _$1
+    done
+  else
+    let x=1
+    until ! (execq entry_$x); do
+      eval _$1
+      let x++
+    done
+  fi
 }
 
 help()
 {
-  # basename -- remove everything before '/' to get
+  # ${0##*/} -- remove everything before '/' to get
   # just executable name
-  echo "stubload version $VERSION"
-  echo "Usage: `(basename $0)` [OPTION]..."
-  echo
-  echo " -h, --help         print help & exit"
-  echo " -v, --verbose      verbose output"
-  echo " -V, --version      print version"
-  echo " -n, --number [#]   specify boot # to target"
-  echo " -l, --list         list entries"
-  echo " -c, --create       create entries"
-  echo " -r, --remove       remove entries"
-  echo
-  echo " --force            continue & ignore errors"
-  echo " --config[=file]    use custom configuration file"
-  echo
-  exit 0
+  echo \
+"stubload version $VERSION
+Usage: ${0##*/} [OPTION]...
+
+ -h, --help        print help & exit
+ -v, --verbose     don't suppress output
+ -V, --version     print version
+ -l, --list        list entries
+ -c, --create      create entries
+ -r, --remove      remove entries
+ -[n]              specify entry's number to target
+
+ --force           ignore errors
+ --config [file]   specify configuration file
+"
 }
 
 sanity_check()
 {
-  # id -u -- get user's UID (root=0, standard!=0)
-  if ! ([ `(id -u)` = 0 ] || [ "$USER" == "root" ]); then
+  # (($UID)) -- UID is non-zero (root UID = 0)
+  if (($UID)) || [ "$USER" != "root" ]; then
     die "insufficient permissions"
   fi
 
   # /sys/firmware/efi -- kernel interface to EFI variables
-  if ! ( (eval efibootmgr >$null) && [ -d "/sys/firmware/efi" ] ); then
+  if (! eval efibootmgr >$void) || [ ! -d "/sys/firmware/efi" ]; then
     die \
       "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
   fi
 
+  configDir=$(basename $config)
   [ -d "$configDir" ] || mkdir -v $configDir
 }
 
@@ -74,15 +88,15 @@ scripts()
   # add a '.' to the front of a script's name to disable it,
   # it will be hidden from `ls`
   for script in /lib/stubload/scripts/*.sh; do
-    eval . "$script" >>$log
+    bash "$script" >>$log
   done
 }
 
 config()
 {
   if (($#)); then
-    base sanity_check
-    configFile="$1"
+    sanity_check
+    config="$1"
   fi
 
   dir() { bootDir="$1" ;}
@@ -91,44 +105,43 @@ config()
   cmdline() { unicode="$1" ;}
   ramdisk() { ramdisk="\\$1" ;}
 
-  # '.' -- POSIX compatible equivilent to bash's 'source'
-  . "$configFile" || die "$configFile: failed to access configuration file"
+  source $config || die "$config: failed to access configuration file"
 }
 
 entry_exists()
 {
-  grep -q "$label" <(efibootmgr)
+  [[ "$(efibootmgr)" =~ "$label" ]]
 }
 
 create_entry()
 {
-  base sanity_check config scripts
+  sanity_check; config; scripts
   cd $configDir
 
-  _create()
+  _create_entry()
   {
     entry_$x
 
     if (entry_exists) && ! (($force)); then
       die \
-        "$label: entry already exists" \
-        $'\n'"use '--force' to ignore"
+        "$label: entry already exists"\
+        "use '--force' to ignore"
     fi
 
     # "${part/ */}" -- get only first string
-    local part=`(grep " $bootDir " </proc/mounts)`; local part="${part/ */}"
+    local part=$(grep " $bootDir " </proc/mounts); local part="${part/ */}"
 
     case "$part" in
       "/dev/nvme"*|"/dev/mmcblk"*)
         # '//p*' -- remove 'p' & everything after 'p'
         # '//*p' -- remove 'p' & everything before 'p'
         local disk="${part//p*}"
-        local partNum="${part//*p}"
+        local partInt="${part//*p}"
         ;;
       "/dev/sd"*)
-        # -E -o '[0-9]' -- remove all non-numbers
+        # '//![0-9]' -- remove all non-numbers
         local disk="${part//sd*}"
-        local partNum=`(grep -E -o '[0-9]' <<<"$part" | xargs)`
+        local partInt="${part//[!0-9]}"
         ;;
       *)
         die "$part: unrecognised disk mapping"
@@ -136,40 +149,30 @@ create_entry()
     esac
 
     echo "create: $label "
-    efibootmgr -c -d "$disk" -p "$partNum" -L "$label" -l "$target" -u "initrd=$ramdisk $unicode" | grep "$label" >>$log
+    efibootmgr -c -d "$disk" -p "$partInt" -L "$label" -l "$target" -u "initrd=$ramdisk $unicode" | grep "$label" >>$log
 
-    if [ $? != 0 ]; then
+    if (($?)); then
       die "$label: failed to add entry"
     fi
   }
 
-  if ((${#NUMARGV[@]})); then
-    for x in ${NUMARGV[@]}; do
-      _create
-    done
-  else
-    let x=1
-    until ! (find_exec entry_$x); do
-      _create
-      let x++
-    done
-  fi
+  sub ${FUNCNAME[0]}
 }
 
 remove_entry()
 {
-  base sanity_check config
+  sanity_check; config
 
-  _remove()
+  _remove_entry()
   {
     entry_$x
 
     echo "remove: $label "
     until ! (entry_exists); do
       # head -n1 -c8 -- get first line & first 8 characters
-      num=`(grep "$label" <(efibootmgr) | head -n1 -c8)` num="${num//Boot}"
+      int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int//Boot}"
 
-      ((${#num})) && efibootmgr -B -b "$num" | grep "$label" >>$log
+      ((${#int})) && efibootmgr -B -b "$int" | grep "$label" >>$log
     done
 
     if (entry_exists); then
@@ -177,43 +180,22 @@ remove_entry()
     fi
   }
 
-  if ((${#NUMARGV[@]})); then
-    for x in ${NUMARGV[@]}; do
-      _remove
-    done
-  else
-    let x=1
-    until ! (find_exec entry_$x); do
-      _remove
-      let x++
-    done
-  fi
+  sub ${FUNCNAME[0]}
 }
 
 list_entry()
 {
-  base sanity_check config
+  sanity_check; config
 
-  _list()
+  _list_entry()
   {
     entry_$x
 
-    num=`(grep "$label" <(efibootmgr) | head -n1 -c8)`
-    num="${num//Boot}"
-    (entry_exists) && echo "$num|$x $label"
+    int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int##Boot}"
+    (entry_exists) && echo "$int|$x $label"
   }
 
-  if ((${#NUMARGV[@]})); then
-    for x in ${NUMARGV[@]}; do
-      _list
-    done
-  else
-    let x=1
-    until ! (find_exec entry_$x); do
-      _list
-      let x++
-    done
-  fi
+  sub ${FUNCNAME[0]}
 }
 
 version()
@@ -225,89 +207,74 @@ version()
 
 parse_arg()
 {
-  RAWARGV=( $* )
-  ARGV=(`
-    for ARG in $*; do
-      # ${ARG##--} -- remove '--' from ARG
-      # fold -w1 -- add space between each character
-      # echo -n -- echo without adding newline at the end (similar to printf's behaviour)
-      case "$ARG" in
-        "--"*)
-          echo -n "${ARG##--} "
-          ;;
-        "-"*)
-          ARG="${ARG##-}"
-          fold -w1 <<<"$ARG"
-          ;;
-      esac
-    done | xargs
-  `)
-
-  _parse_narg()
-  {
-    NUMARGV=(`
-      for ARG in $*; do
-        # -qE '[^0-9+$]' -- remove anything that doesn't match regex [0-9] (numbers only)
-        if (grep -qE '^[0-9]+$' <<<"$ARG"); then
-          echo -n "$ARG "
-        fi
-      done
-    `)
-
-    if ! ((${#NUMARGV[@]})); then
-      die "must provide at least 1 number"
-    fi
-  }
-
-  _argx()
-  {
-    _conflict_check()
-    {
-      ((${#ARGX[$1]})) && die "conflicting arguments provided"
-    }
-
+  # (($#)) -- number of arguments is non-zero
+  while (($#)); do
     case "$1" in
-      "version"|"help"|"list_entry"|"remove_entry")
-        _conflict_check 1
-        ARGX[1]="$1"
+      "--config")
+        shift
+        config="$1"
+      ;;
+      "--"*)
+        ARGV+=( ${1##--} )
         ;;
-      "create_entry")
-        _conflict_check 2
-        ARGX[2]="$1"
-        ;;
-      *)
-        _conflict_check 0
-        ARGX[0]="$1"
+      "-"*)
+      # ${1//[!0-9]} -- remove all non-numbers from $1
+        if ((${1//[!0-9]})); then
+          NUMARGV+=( ${1//[!0-9]} )
+        else
+          # fold -w1 -- add spaces between each character
+          ARGV+=( $(fold -w1 <<<"${1##-}") )
+        fi
         ;;
     esac
+    # move $2 to $1
+    shift
+  done
+
+  ARGV=($(xargs <<<"${ARGV[@]}"))
+  NUMARGV=($(xargs <<<"${NUMARGV[@]}"))
+
+  _arg()
+  {
+    case "$1" in
+      "version"|"help"|"list_entry"|"remove_entry") i=1 ;;
+      "create_entry") i=2 ;;
+      *) i=0 ;;
+    esac
+
+    if ((${#ARGX[$i]})); then
+      die "conflicting arguments provided"
+    else
+      ARGX[$i]="$1"
+    fi
   }
 
   for ARG in ${ARGV[@]}; do
     case "$ARG" in
       "force") force=1 ;;
-      "config="*) config "${ARG##config=}" ;;
       "verbose"|"v") verbose=1 ;;
-      "version"|"V") _argx version ;;
-      "help"|"h") _argx help ;;
-      "number"|"n"*) _parse_narg $* ;;
-      "list"|"l") _argx list_entry ;;
-      "remove"|"r") _argx remove_entry ;;
-      "create"|"c") _argx create_entry ;;
+      "version"|"V") _arg "version" ;;
+      "help"|"h") _arg "help" ;;
+      "list"|"l") _arg "list_entry" ;;
+      "remove"|"r") _arg "remove_entry" ;;
+      "create"|"c") _arg "create_entry" ;;
       *) die "invalid argument -- $ARG"
     esac
   done
 
-  ((${#ARGX[@]})) || _argx help
+  ((${#ARGX[@]})) || _arg "help"
 }
 
-configFile="/etc/efistub/stubload.conf"
-configDir=`(dirname $configFile)`
-null=/dev/null
+((${#config})) || config="/etc/efistub/stubload.conf"
+void=/dev/null
 
-parse_arg "$*"
+if (($verbose)); then
+  log="/dev/stdout"
+else
+  log="/dev/null"
+fi
 
-(($verbose)) && log="/dev/stdout" || log="/dev/null"
-
+parse_arg $*
 for exec in ${ARGX[@]}; do
-  eval "$exec"
+  eval $exec
 done

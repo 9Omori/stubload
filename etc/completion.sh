@@ -1,54 +1,63 @@
 _stubload_completion()
 {
-  local cur
+  local cur prev
   _init_completion || return
 
   LONGARGV=(
     "--help"
     "--verbose"
     "--version"
-    "--number"
     "--list"
     "--create"
     "--remove"
     "--force"
-    "--config="
+    "--config "
   )
   SHORTARGV=(
     "-h"
     "-v"
     "-V"
-    "-n"
     "-l"
     "-c"
     "-r"
   )
 
-  case "$cur" in
-    "-n"|"--number")
-      RES="1 2 3 4 5 6 7 8 9"
-    ;;
-    "--config=")
-      RES=`(ls)`
-    ;;
-    "--"*)
-      RES="${LONGARGV[@]}"
-    ;;
-    "-")
-      RES="${SHORTARGV[@]}"
-    ;;
-    "-"*)
-      RES="$cur"
-    ;;
-    *)
-      RES="${SHORTARGV[@]}"
-    ;;
+  case "$prev" in
+    "--config")
+      if ! [[ "$cur" == *"/" ]]; then
+        RES="$cur/"
+      else
+        RES="$cur"
+      fi
+      COMPREPLY=( $(compgen -f -- $RES) )
+      return
+      ;;
   esac
 
-  if [ "${#RES}" -gt 1 ]; then
-    COMPREPLY=( `(compgen -W "$RES" -- $cur)` )
+  if ! ((${#RES})); then
+    case "$cur" in
+      "-n"|"--number")
+        RES="1 2 3 4 5 6 7 8 9"
+      ;;
+      "--"*)
+        RES="${LONGARGV[@]}"
+      ;;
+      "-")
+        RES="${SHORTARGV[@]}"
+      ;;
+      "-"*)
+        RES="$cur"
+      ;;
+      *)
+        RES="${SHORTARGV[@]}"
+      ;;
+    esac
   fi
 
-  return
+  if ((${#RES})); then
+    COMPREPLY=( $(compgen -W "$RES" -- $cur) )
+  fi
+
+  unset LONGARGV SHORTARGV RES
 }
 complete -F _stubload_completion stubload

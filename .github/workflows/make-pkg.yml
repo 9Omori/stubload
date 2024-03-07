@@ -1,0 +1,106 @@
+name: Package
+
+on:
+  push:
+    paths:
+      - 'bin/stubload.sh'
+      - 'etc/completion.sh'
+      - 'etc/stubload.conf'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        version: ['0.1.3']
+        full-version: ['0.1.3-6']
+
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Setup structure
+      run: |
+        mkdir -p \
+          ~/deb \
+          ~/rpmbuild ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} \
+          ~/tar
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y rpm git tar zstd zip
+
+    - name: Clone repository
+      run: |
+        git clone https://github.com/9Omori/stubload.git ~/source
+        cd ~/deb
+        ln -s ../source .
+
+    - name: Setup environment
+      run: |
+        cd ~/deb/build
+
+        mkdir -p \
+          usr/bin \
+          etc/efistub \
+          usr/share/bash-completions/completions \
+          lib/stubload/scripts
+
+        mv ~/source/.github/build/deb/control DEBIAN
+        cp ~/source/bin/stubload.sh usr/bin/stubload
+        cp ~/source/etc/completion.sh usr/share/bash-completion/completions/stubload
+
+        sudo chmod +x usr/bin/stubload
+        sudo chown -R root:root etc/efistub
+        sudo chmod 700 etc/efistub
+
+        cd ~/rpmbuild
+        
+        mkdir stubload-${{ matrix.version }}
+        ln -s stubload-${{ matrix.version }} stubload
+        mv ~/source/.github/build/rpm/stubload.spec SPECS/
+        cp ~/source/bin/stubload.sh ~/source/etc/completion.sh stubload/
+        
+        sudo chmod +x stubload/stubload.sh
+        sudo chown -R root:root stubload
+        sudo chmod 700 stubload
+
+        sudo tar -czvf SOURCES/stubload-${{ matrix.version }}.tgzt stubload-${{ matrix.version }}
+
+        cd ~/tar
+
+        mkdir -p \
+          usr/bin \
+          etc/efistub \
+          usr/share/bash-completion/completions \
+          lib/stubload/scripts
+        
+        cp ~/source/bin/stubload.sh usr/bin/stubload
+        cp ~/source/etc/completion.sh usr/share/bash-completion/completions/stubload
+
+        sudo chmod +x usr/bin/stubload
+        sudo chown -R root:root etc/efistub
+        sudo chmod 700 etc/efistub
+        
+        rm -rf $(ls -A | sed 's/usr//; s/etc//')
+
+    - name: Build package
+      run: |
+        cd ~/deb/build
+        sudo dpkg-deb --root-owner-group --build $(pwd)
+        sudo chown $USER ../*.deb
+        mv ../*.deb ~/stubload-${{ matrix.full-version }}.allarch.deb
+
+        cd ~/rpmbuild
+        rpmbuild -bb SPECS/stubload.spec
+        mv RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.tzst
+
+        cd ~/tar
+        sudo tar --zstd -cvf stubload.tzst *
+        sudo mv *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
+
+    - name: Upload final output
+      uses: actions/upload-artifact@v3
+      with:
+        name: out
+        path: ~/*.rpm ~/*.deb ~/*.tzst
