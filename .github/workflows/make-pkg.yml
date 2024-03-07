@@ -95,26 +95,14 @@ jobs:
 
         cd ~/rpmbuild
         rpmbuild -bb SPECS/stubload.spec
-        mv -v ~/rpmbuild/RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.tzst
+        mv -v RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.rpm
 
         cd ~/tar
-        tar --zstd -cvf stubload.tzst *
-        mv -v *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
+        sudo tar --zstd -cvf stubload.tzst *
+        sudo mv -v *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
 
-    - name: Upload DEB
+    - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
-        name: deb-out
-        path: ~/*.deb
-
-    - name: Upload RPM
-      uses: actions/upload-artifact@v4
-      with:
-        name: rpm-out
-        path: ~/*.rpm
-    
-    - name: Upload TZST
-      uses: actions/upload-artifact@v4
-      with:
-        name: tar-out
-        path: ~/*.tzst
+        name: out
+        path: ~/*.deb ~/*.rpm ~/*.tzst
