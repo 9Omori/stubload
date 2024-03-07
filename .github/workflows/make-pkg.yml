@@ -105,4 +105,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: out
-        path: ~/*.rpm ~/*.deb ~/*.tzst
+        path:
+          ~/stubload-${{ matrix.full-version }}.allarch.deb
+          ~/stubload-${{ matrix.full-version }}.allarch.rpm
+          ~/stubload-${{ matrix.full-version }}.allarch.tzst
