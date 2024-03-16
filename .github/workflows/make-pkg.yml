@@ -2,12 +2,8 @@ name: Package
 
 on:
   push:
-    paths:
-      - 'bin/stubload.sh'
-      - 'etc/completion.sh'
-      - 'etc/stubload.conf'
-      - 'build.sh'
-      - '.github/workflows/make-pkg.yml'
+    tags:
+      - "(re)*"
   workflow_dispatch:
 
 jobs:
@@ -25,12 +21,14 @@ jobs:
         sudo mv ~/work/stubload/stubload/build/out ~/out
 
     - name: Upload release
-      run: |
-        gh release upload \
-          $VERSION \
-          out/*.rpm out/*.deb out/*.tzst
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ~/out/*.deb
+          ~/out/*.rpm
+          ~/out/*.tzst
 
-    - name: Upload package
+    - name: Upload package as artifact
       uses: actions/upload-artifact@v4
       with:
         name: out
