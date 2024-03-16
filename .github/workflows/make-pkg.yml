@@ -18,8 +18,17 @@ jobs:
     - name: Run build script
       run: |
         BUILD="https://raw.githubusercontent.com/9Omori/stubload/main/build.sh"
+        VERSION="0.1.3"
+        FULL_VERSION="0.1.3-7"
+
         curl -Ls -o- $BUILD | sudo PWD=$HOME bash
         sudo mv ~/work/stubload/stubload/build/out ~/out
+
+    - name: Upload release
+      run: |
+        gh release upload \
+          $VERSION \
+          out/*.rpm out/*.deb out/*.tzst
 
     - name: Upload package
       uses: actions/upload-artifact@v4
