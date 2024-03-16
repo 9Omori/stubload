@@ -19,7 +19,7 @@ jobs:
       run: |
         BUILD="https://raw.githubusercontent.com/9Omori/stubload/main/build.sh"
         curl -Ls -o- $BUILD | sudo PWD=$HOME bash
-        mv ~/work/stubload/stubload/build/out ~/out
+        sudo mv ~/work/stubload/stubload/build/out ~/out
 
     - name: Upload package
       uses: actions/upload-artifact@v4
