@@ -2,8 +2,12 @@ name: Package
 
 on:
   push:
-    tags:
-      - "(re)*"
+    paths:
+      - 'bin/stubload.sh'
+      - 'etc/completion.sh'
+      - 'etc/stubload.conf'
+      - 'build.sh'
+      - '.github/workflows/make-pkg.yml'
   workflow_dispatch:
 
 jobs:
