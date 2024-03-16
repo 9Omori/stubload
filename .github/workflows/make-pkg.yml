@@ -17,8 +17,8 @@ jobs:
 
     - name: Run build script
       run: |
-        curl -LsO https://raw.githubusercontent.com/9Omori/stubload/main/build.sh
-        sudo bash ./build.sh
+        BUILD="https://raw.githubusercontent.com/9Omori/stubload/main/build.sh"
+        curl -Ls -o- $BUILD | sudo PWD=$HOME bash
 
     - name: Upload package
       uses: actions/upload-artifact@v4
