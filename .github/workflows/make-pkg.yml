@@ -25,6 +25,7 @@ jobs:
           ~/deb/build \
           ~/rpmbuild ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} \
           ~/tar
+        mkdir ~/out
 
     - name: Install dependencies
       run: |
@@ -91,30 +92,21 @@ jobs:
         cd ~/deb/build
         sudo dpkg-deb --root-owner-group --build $(pwd)
         sudo chown $USER ../*.deb
-        mv -v ../*.deb ~/stubload-${{ matrix.full-version }}.allarch.deb
-
+        
         cd ~/rpmbuild
         rpmbuild -bb SPECS/stubload.spec
-        mv -v RPMS/noarch/*.rpm ~/stubload-${{ matrix.full-version }}.allarch.rpm
 
         cd ~/tar
         sudo tar --zstd -cvf stubload.tzst *
-        sudo mv -v *.tzst ~/stubload-${{ matrix.full-version }}.allarch.tzst
 
-    - name: Upload DEB
-      uses: actions/upload-artifact@v4
-      with:
-        name: deb-out
-        path: ~/*.deb
-    
-    - name: Upload RPM
-      uses: actions/upload-artifact@v4
-      with:
-        name: rpm-out
-        path: ~/*.rpm
+        sudo mv -v ../*.deb ~/out/stubload-${{ matrix.full-version }}.allarch.deb
+        sudo mv -v RPMS/noarch/*.rpm ~/out/stubload-${{ matrix.full-version }}.allarch.rpm
+        sudo mv -v *.tzst ~/out/stubload-${{ matrix.full-version }}.allarch.tzst
 
-    - name: Upload TZST
+        sudo chown -R $USER ~/out
+
+    - name: Upload package
       uses: actions/upload-artifact@v4
       with:
-        name: tar-out
-        path: ~/*.tzst
+        name: out
+        path: ~/out

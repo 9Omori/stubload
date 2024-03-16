@@ -34,21 +34,21 @@ sub()
 {
   if ((${#NUMARGV[@]})); then
     for x in ${NUMARGV[@]}; do
-      eval _$1
+      eval "_$1"
     done
   else
     let x=1
     until ! (execq entry_$x); do
-      eval _$1
+      eval "_$1"
       let x++
     done
   fi
 }
 
-help()
+usage()
 {
-  # ${0##*/} -- remove everything before '/' to get
-  # just executable name
+  # ${0##*/} -- remove everything before '/' to
+  # get just executable name
   echo \
 "stubload version $VERSION
 Usage: ${0##*/} [OPTION]...
@@ -68,8 +68,8 @@ Usage: ${0##*/} [OPTION]...
 
 sanity_check()
 {
-  # (($UID)) -- UID is non-zero (root UID = 0)
-  if (($UID)) || [ "$USER" != "root" ]; then
+  # -r -- test read permission for file
+  if [ ! -r "$config" ]; then
     die "insufficient permissions"
   fi
 
@@ -79,7 +79,7 @@ sanity_check()
       "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
   fi
 
-  configDir=$(basename $config)
+  configDir=$(dirname $config)
   [ -d "$configDir" ] || mkdir -v $configDir
 }
 
@@ -103,7 +103,7 @@ config()
   label() { label="$1" ;}
   target() { target="$1" ;}
   cmdline() { unicode="$1" ;}
-  ramdisk() { ramdisk="\\$1" ;}
+  ramdisk() { ramdisk="$1" ;}
 
   source $config || die "$config: failed to access configuration file"
 }
@@ -129,7 +129,8 @@ create_entry()
     fi
 
     # "${part/ */}" -- get only first string
-    local part=$(grep " $bootDir " </proc/mounts); local part="${part/ */}"
+    part=$(grep " $bootDir " </proc/mounts); part="${part// *}"
+    local part="$part"
 
     case "$part" in
       "/dev/nvme"*|"/dev/mmcblk"*)
@@ -149,7 +150,7 @@ create_entry()
     esac
 
     echo "create: $label "
-    efibootmgr -c -d "$disk" -p "$partInt" -L "$label" -l "$target" -u "initrd=$ramdisk $unicode" | grep "$label" >>$log
+    efibootmgr -c -d "$disk" -p "$partInt" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" >>$log
 
     if (($?)); then
       die "$label: failed to add entry"
@@ -207,66 +208,51 @@ version()
 
 parse_arg()
 {
-  # (($#)) -- number of arguments is non-zero
-  while (($#)); do
-    case "$1" in
-      "--config")
-        shift
-        config="$1"
-      ;;
-      "--"*)
-        ARGV+=( ${1##--} )
-        ;;
-      "-"*)
-      # ${1//[!0-9]} -- remove all non-numbers from $1
-        if ((${1//[!0-9]})); then
-          NUMARGV+=( ${1//[!0-9]} )
-        else
-          # fold -w1 -- add spaces between each character
-          ARGV+=( $(fold -w1 <<<"${1##-}") )
-        fi
-        ;;
-    esac
-    # move $2 to $1
-    shift
-  done
-
-  ARGV=($(xargs <<<"${ARGV[@]}"))
-  NUMARGV=($(xargs <<<"${NUMARGV[@]}"))
-
   _arg()
   {
     case "$1" in
-      "version"|"help"|"list_entry"|"remove_entry") i=1 ;;
+      "version"|"usage"|"list_entry"|"remove_entry") i=1 ;;
       "create_entry") i=2 ;;
       *) i=0 ;;
     esac
 
-    if ((${#ARGX[$i]})); then
-      die "conflicting arguments provided"
-    else
-      ARGX[$i]="$1"
-    fi
+    ARGX[$i]="$1"
   }
 
-  for ARG in ${ARGV[@]}; do
+  for ARG in $@; do
     case "$ARG" in
-      "force") force=1 ;;
-      "verbose"|"v") verbose=1 ;;
-      "version"|"V") _arg "version" ;;
-      "help"|"h") _arg "help" ;;
-      "list"|"l") _arg "list_entry" ;;
-      "remove"|"r") _arg "remove_entry" ;;
-      "create"|"c") _arg "create_entry" ;;
-      *) die "invalid argument -- $ARG"
+      "--"*)
+        :
+        ;;
+      "-"*)
+        for SHORTARG in $(fold -w1 <<<"${ARG//-}" | xargs); do
+          set -- "-$SHORTARG" ${@/-$SHORTARG}
+        done
+        ;;
     esac
   done
 
-  ((${#ARGX[@]})) || _arg "help"
+  while (($#)); do
+    case "$1" in
+      "--force") force=1 ;;
+      "--verbose"|"-v") verbose=1 ;;
+      "--version"|"-V") _arg "version" ;;
+      "--help"|"-h") _arg "usage" ;;
+      "--list"|"-l") _arg "list_entry" ;;
+      "--remove"|"-r") _arg "remove_entry" ;;
+      "--create"|"-c") _arg "create_entry" ;;
+      "--"*|"-"*) die "$1: unrecognised argument" ;;
+    esac
+    shift
+  done
+
+  ((${#ARGX[@]})) || _arg "usage"
 }
 
 ((${#config})) || config="/etc/efistub/stubload.conf"
 void=/dev/null
+
+parse_arg $@
 
 if (($verbose)); then
   log="/dev/stdout"
@@ -274,7 +260,6 @@ else
   log="/dev/null"
 fi
 
-parse_arg $*
-for exec in ${ARGX[@]}; do
-  eval $exec
+for func in ${ARGX[@]}; do
+  eval "$func"
 done
