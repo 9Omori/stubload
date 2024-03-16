@@ -6,124 +6,22 @@ on:
       - 'bin/stubload.sh'
       - 'etc/completion.sh'
       - 'etc/stubload.conf'
+      - 'build.sh'
       - '.github/workflows/make-pkg.yml'
   workflow_dispatch:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        version: ['0.1.3']
-        full-version: ['0.1.3-7']
-
     runs-on: ubuntu-latest
     steps:
 
-    - name: Setup structure
+    - name: Run build script
       run: |
-        mkdir -pv \
-          ~/deb/build \
-          ~/rpmbuild ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} \
-          ~/tar
-        mkdir ~/out
-
-    - name: Install dependencies
-      run: |
-        sudo bash <<<'
-          apt update
-          apt install -y rpm git tar zstd gzip
-        '
-
-    - name: Clone repository
-      run: |
-        git clone https://github.com/9Omori/stubload.git ~/source
-        cd ~/deb
-        ln -s ../source .
-
-    - name: Setup environment
-      run: |
-        sudo bash <<<"
-          export HOME=/home/runner
-
-          cd ~/deb/build
-          (
-            mkdir -pv \
-              DEBIAN \
-              usr/bin \
-              etc/efistub \
-              usr/share/bash-completions/completions \
-              lib/stubload/scripts
-
-            mv -v ~/source/.github/build/deb/control DEBIAN/control
-            cp -v ~/source/bin/stubload.sh usr/bin/stubload
-            cp -v ~/source/etc/completion.sh usr/share/bash-completions/completions/stubload
-
-            chmod +x usr/bin/stubload
-            chown -R root:root etc/efistub
-            chmod 700 etc/efistub
-          )
-
-          cd ~/rpmbuild
-          (
-            mkdir -v stubload-${{ matrix.version }}
-            ln -s stubload-${{ matrix.version }} stubload
-            mv -v ~/source/.github/build/rpm/stubload.spec SPECS/
-            cp -v ~/source/bin/stubload.sh ~/source/etc/completion.sh stubload/
-            
-            chmod +x stubload/stubload.sh
-            chown -R root:root stubload
-            chmod 700 stubload
-
-            tar --gzip -cvf SOURCES/stubload-${{ matrix.version }}.tgz stubload-${{ matrix.version }}
-          )
-
-          cd ~/tar
-          (
-            mkdir -pv \
-              usr/bin \
-              etc/efistub \
-              usr/share/bash-completion/completions \
-              lib/stubload/scripts
-            
-            cp -v ~/source/bin/stubload.sh usr/bin/stubload
-            cp -v ~/source/etc/completion.sh usr/share/bash-completion/completions/stubload
-
-            chmod +x usr/bin/stubload
-            chown -R root:root etc/efistub
-            chmod 700 etc/efistub
-            
-            rm -rfv $(ls -A | sed 's/usr//; s/etc//')
-          )
-        "
-
-    - name: Build package
-      run: |
-        sudo bash <<<"
-          export HOME=/home/runner
-
-          cd ~/deb/build
-          dpkg-deb --root-owner-group --build $PWD
-          mv ../*.deb ~
-
-          cd ~/rpmbuild
-          rpmbuild -bb SPECS/stubload.spec
-          mv *.rpm ~
-
-          cd ~/tar
-          tar --zstd -cvf stubload.tzst *
-          mv *.tzst ~
-
-          for pkg in ~/*.deb ~/*.rpm ~/*.tzst; do
-            pkgformat="${pkg/*.}"
-            new="stubload-${{ matrix.full-version }}.allarch.$pkgformat"
-            mv -v $pkg ~/$new
-          done
-
-          chown -R runner ~/out
-        "
+        curl -LsO https://raw.githubusercontent.com/9Omori/stubload/main/build.sh
+        ./build.sh
 
     - name: Upload package
       uses: actions/upload-artifact@v4
       with:
         name: out
-        path: ~/out
+        path: ~/build/out
