@@ -103,13 +103,15 @@ jobs:
 
           cd ~/deb/build
           dpkg-deb --root-owner-group --build $PWD
-          chown runner ../*.deb
+          mv ../*.deb ~
 
           cd ~/rpmbuild
           rpmbuild -bb SPECS/stubload.spec
+          mv *.rpm ~
 
           cd ~/tar
           tar --zstd -cvf stubload.tzst *
+          mv *.tzst ~
 
           for pkg in ~/*.deb ~/*.rpm ~/*.tzst; do
             pkgformat="${pkg/*.}"
