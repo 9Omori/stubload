@@ -8,8 +8,6 @@ on:
       - 'etc/stubload.conf'
       - 'build.sh'
       - '.github/workflows/make-pkg.yml'
-    tags:
-      - "0.1.3"
   workflow_dispatch:
 
 jobs:
@@ -25,14 +23,6 @@ jobs:
 
         curl -Ls -o- $BUILD | sudo PWD=$HOME bash
         sudo mv ~/work/stubload/stubload/build/out ~/out
-
-    - name: Upload release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          ~/out/*.deb
-          ~/out/*.rpm
-          ~/out/*.tzst
 
     - name: Upload package as artifact
       uses: actions/upload-artifact@v4
