@@ -167,10 +167,10 @@ fi
 while (($#)); do
   case "$1" in
     "--structure")
-      sanity_check; initialise; $1
+      sanity_check; initialise; structure
       ;;
     "--"*)
-      $1
+      ${1/--}
       ;;
     *)
       die "unrecognised argument -- ${1//-}"
