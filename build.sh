@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bash -e
 
 VERSION="0.1.3"
-FULL_VERSION="0.1.3-7"
+FULL_VERSION="0.1.3-6"
 
 die()
 {
@@ -15,7 +15,7 @@ PKGS=(rpm git tar zstd gzip)
 BUILD="$PWD/build"
 OUT="$BUILD/out"
 
-echo "Running sanity check:"
+sanity_check()
 {
   if ! ([ "$UID" = '0' ] && [ "$USER" == "root" ]); then
     sudo $0 ${@/$0}
@@ -24,16 +24,20 @@ echo "Running sanity check:"
   if ! (command -v apt >/dev/null); then
     die "apt not found, build.sh must be ran on a Debian-based distro"
   fi
+
+  if ! [ -d ".git" ]; then
+    die "build.sh must be ran in the GitHub repository"
+  fi
 }
 
-echo "Initialising:"
+initialise()
 {
   echo "$BUILD"
   mkdir -v $BUILD
   cd $BUILD
 }
 
-echo "Setting up structure:"
+structure()
 {
   cd $BUILD
   echo "$PWD"
@@ -45,25 +49,25 @@ echo "Setting up structure:"
   mkdir -v $OUT
 }
 
-echo "Installing dependencies:"
+setup_repo()
+{
+  cd $BUILD
+  ln -s .. source
+}
+
+dependencies()
 {
   apt update
   apt install -y "${PKGS[@]}"
 }
 
-echo "Cloning repository:"
-{
-  cd $BUILD
-  git clone "$GIT_REPO" ./source
-
-  cd $BUILD/deb
-  ln -s ../source .
-}
-
-echo "Setting up environment:"
+environment()
 {
   echo "Format: DEB"
   {
+    cd $BUILD/deb
+    ln -s ../source .
+
     cd $BUILD/deb/build
 
     mkdir -p -v \
@@ -119,7 +123,7 @@ echo "Setting up environment:"
   }
 }
 
-echo "Build package:"
+build_package()
 {
   echo "Format: DEB"
   {
@@ -150,3 +154,27 @@ echo "Build package:"
 
   echo "Output: " $OUT/*
 }
+
+if ! (($#)); then
+  sanity_check; initialise
+  setup_repo
+  structure
+  dependencies
+  environment
+  build_package
+fi
+
+while (($#)); do
+  case "$1" in
+    "--structure")
+      sanity_check; initialise; $1
+      ;;
+    "--"*)
+      $1
+      ;;
+    *)
+      die "unrecognised argument -- ${1//-}"
+      ;;
+    esac
+    shift
+done

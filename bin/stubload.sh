@@ -68,6 +68,11 @@ Usage: ${0##*/} [OPTION]...
 
 sanity_check()
 {
+  # BASH_VERSINFO[0] -- get 'x' from bash version x.y.z (e.g. 5 from 5.2.26)
+  if ((${BASH_VERSINFO[0]} < 5)); then
+    die "stubload is only compatible with bash version 5 and up"
+  fi
+
   # -r -- test read permission for file
   if [ ! -r "$config" ]; then
     die "insufficient permissions"

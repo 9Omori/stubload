@@ -15,14 +15,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Run build script
+    - name: Clone repository
       run: |
-        BUILD="https://raw.githubusercontent.com/9Omori/stubload/main/build.sh"
-        VERSION="0.1.3"
-        FULL_VERSION="0.1.3-7"
+        git clone https://github.com/9Omori/stubload.git ~/stubload
+      
+    - name: Create structure
+      run: |
+        ~/stubload/build.sh --structure
+        ~/stubload/build.sh --setup_repo
+      
+    - name: Install dependencies
+      run: |
+        ~/stubload/build.sh --dependencies
 
-        curl -Ls -o- $BUILD | sudo PWD=$HOME bash
-        sudo mv ~/work/stubload/stubload/build/out ~/out
+    - name: Setup environment
+      run: |
+        ~/stubload/build.sh --environment
+
+    - name: Build packages
+      run: |
+        ~/stubload/build.sh --build_package
+        mv ~/build/out ~/out
 
     - name: Upload package as artifact
       uses: actions/upload-artifact@v4
