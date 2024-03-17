@@ -40,7 +40,7 @@ jobs:
       run: |
         cd ~/stubload
         ./build.sh --build_package
-        mv ./build/out ~/out
+        sudo mv ./build/out ~/out
 
     - name: Upload package as artifact
       uses: actions/upload-artifact@v4
