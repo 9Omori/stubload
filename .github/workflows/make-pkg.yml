@@ -18,24 +18,29 @@ jobs:
     - name: Clone repository
       run: |
         git clone https://github.com/9Omori/stubload.git ~/stubload
+        chmod a+x ~/stubload/build.sh
       
     - name: Create structure
       run: |
-        ~/stubload/build.sh --structure
-        ~/stubload/build.sh --setup_repo
+        cd ~/stubload
+        ./build.sh --structure
+        ./build.sh --setup_repo
       
     - name: Install dependencies
       run: |
-        ~/stubload/build.sh --dependencies
+        cd ~/stubload
+        ./build.sh --dependencies
 
     - name: Setup environment
       run: |
-        ~/stubload/build.sh --environment
+        cd ~/stubload
+        ./build.sh --environment
 
     - name: Build packages
       run: |
-        ~/stubload/build.sh --build_package
-        mv ~/build/out ~/out
+        cd ~/stubload
+        ./build.sh --build_package
+        mv ./build/out ~/out
 
     - name: Upload package as artifact
       uses: actions/upload-artifact@v4
