@@ -15,32 +15,27 @@ PKGS=(rpm git tar zstd gzip)
 BUILD="$PWD/build"
 OUT="$BUILD/out"
 
+if (($UID)); then
+  sudo $0 $@
+  exit
+fi
+
 sanity_check()
 {
-  if ! ([ "$UID" = '0' ] && [ "$USER" == "root" ]); then
-    sudo $0 ${@/$0}
-  fi
+  [ -d "$BUILD" ] || mkdir -v "$BUILD"
 
-  if ! (command -v apt >/dev/null); then
+  if (! command -v apt >/dev/null); then
     die "apt not found, build.sh must be ran on a Debian-based distro"
   fi
 
-  if ! [ -d ".git" ]; then
+  if [ ! -d ".git" ]; then
     die "build.sh must be ran in the GitHub repository"
   fi
-}
-
-initialise()
-{
-  echo "$BUILD"
-  mkdir -v $BUILD
-  cd $BUILD
 }
 
 structure()
 {
   cd $BUILD
-  echo "$PWD"
 
   mkdir -p -v \
     ./deb/build/ \
@@ -77,7 +72,7 @@ environment()
       usr/share/bash-completions/completions \
       lib/stubload/scripts
 
-    mv -v $BUILD/source/.github/build/deb/control DEBIAN/control
+    cp -v $BUILD/source/.github/build/deb/control DEBIAN/control
     cp -v $BUILD/source/bin/stubload.sh usr/bin/stubload
     cp -v $BUILD/source/etc/completion.sh usr/share/bash-completions/stubload
 
@@ -92,7 +87,7 @@ environment()
 
     mkdir -p -v stubload-$VERSION
     ln -s stubload-$VERSION stubload
-    mv -v $BUILD/source/.github/build/rpm/stubload.spec SPECS/
+    cp -v $BUILD/source/.github/build/rpm/stubload.spec SPECS/
     cp -v $BUILD/source/bin/stubload.sh $BUILD/source/etc/completion.sh stubload/
 
     chmod +x ./stubload/stubload.sh
@@ -152,29 +147,30 @@ build_package()
     mv -v $pkg $OUT/$new
   done
 
-  echo "Output: " $OUT/*
+  echo "Output: "
+  for OUTFILE in $OUT/*; do
+    echo " * $OUTFILE"
+  done
+  exit 0
 }
-
-if ! (($#)); then
-  sanity_check; initialise
-  setup_repo
-  structure
-  dependencies
-  environment
-  build_package
-fi
 
 while (($#)); do
   case "$1" in
-    "--structure")
-      sanity_check; initialise; structure
+    "--all"|"-")
+      sanity_check
+      setup_repo
+      structure
+      dependencies
+      environment
+      build_package
       ;;
     "--"*)
+      sanity_check
       ${1/--}
       ;;
     *)
       die "unrecognised argument -- ${1//-}"
       ;;
-    esac
-    shift
+  esac
+  shift
 done
