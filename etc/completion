@@ -7,16 +7,22 @@ _stubload_completion()
     "--help"
     "--verbose"
     "--version"
+    "--edit_config"
+    "--add_cmdline"
+    "--rm_cmdline"
     "--list"
     "--create"
     "--remove"
     "--force"
-    "--config "
+    "--config"
   )
   SHORTARGV=(
     "-h"
     "-v"
     "-V"
+    "-C"
+    "-A"
+    "-R"
     "-l"
     "-c"
     "-r"
@@ -28,6 +34,7 @@ _stubload_completion()
         RES="$cur/"
       else
         RES="$cur"
+        unset prev
       fi
       COMPREPLY=( $(compgen -f -- $RES) )
       return
@@ -36,21 +43,18 @@ _stubload_completion()
 
   if ! ((${#RES})); then
     case "$cur" in
-      "-n"|"--number")
-        RES="1 2 3 4 5 6 7 8 9"
-      ;;
       "--"*)
         RES="${LONGARGV[@]}"
-      ;;
+        ;;
       "-")
         RES="${SHORTARGV[@]}"
-      ;;
+        ;;
       "-"*)
         RES="$cur"
-      ;;
+        ;;
       *)
         RES="${SHORTARGV[@]}"
-      ;;
+        ;;
     esac
   fi
 

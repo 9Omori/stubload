@@ -100,7 +100,7 @@ dependencies()
 {
   apt update ||
     dnf makecache ||
-    pacman -Sy ||
+    pacman -Syy ||
     emerge --ask --sync
   
   for PKG in ${PKGS[@]}; do

@@ -9,44 +9,49 @@ TIME="18:10"
 DATE="18/03/2024"
 TZONE="gmt"
 
+REPO="9Omori/stubload"
+
 EVERSION=$(efibootmgr -V) EVERSION="${EVERSION/* }"
 
-die()
+function die
 {
   # \e[1;31m -- change output to red
   # \e[0m -- change output to default
+  local red=$'\e[1;31m'
+  local none=$'\e[0m'
+
   # >&2 -- redirect stdout to stderr
-  echo $'\e[1;31m'"error:" $'\e[0m'"$1" >&2 && shift
+  echo $red"error:"$none "$1" >&2 && shift
  
   while (($#)); do
     echo "$1" >&2 && shift
   done
 
-  (($force)) && return 1
-  exit 1
+  (($force)) || return 1
 }
 
-execq()
+function execq
 {
-  eval command -v "$1" >$void
+  command -v "$1" >$void
+  return $?
 }
 
-sub()
+function sub
 {
   if ((${#NUMARGV[@]})); then
-    for x in ${NUMARGV[@]}; do
-      eval "_$1"
+    for i in ${NUMARGV[@]}; do
+      _$1
     done
   else
-    x=1
-    until ! (execq entry_$x); do
-      eval "_$1"
-      let x++
+    declare -i i=1
+    while (execq entry_$i); do
+      _$1
+      i+=1
     done
   fi
 }
 
-usage()
+function usage
 {
   # ${0/*\/} -- remove everything before '/' to
   # get just executable name
@@ -58,6 +63,7 @@ Usage: ${0/*\/} [OPTION]...
  -v, --verbose       don't suppress output
  -V, --version       print version
  -C, --edit_config   edit configuration file
+ -G, --cmdline       get current cmdline
  -A, --add_cmdline   add option to kernel cmdline
  -R, --rm_cmdline    remove option from kernel cmdline
  -l, --list          list entries
@@ -70,7 +76,7 @@ Usage: ${0/*\/} [OPTION]...
 "
 }
 
-scripts()
+function scripts
 {
   # add a '.' to the front of a script's name to disable it
   for script in /lib/stubload/scripts/*.sh; do
@@ -78,13 +84,12 @@ scripts()
   done
 }
 
-preset()
+function preset
 {
-  PRESET="$1"; shift
-  source /lib/stubload/presets/"$PRESET" >>$log
+  source /lib/stubload/presets/"$1" >>$log
 }
 
-config()
+function config
 {
   if (($configArg)) && ((${#STRARGV[@]})); then
     config="${STRARGV[0]}"
@@ -125,12 +130,16 @@ config()
   source "$config" || die "$config: failed to access configuration file"
 }
 
-edit_config()
+function edit_config
 {
-  config
-
   ((${#EDITOR})) || EDITOR=vi
   TMP="$configDir/$configBase-$(date +%s).tmp"
+
+  if ! [ -f "$config" ]; then
+    curl -Ls https://raw.githubusercontent.com/$REPO/main/etc/stubload.conf -o /etc/efistub/stubload.conf
+    echo "$config: downloaded config file"
+  fi
+  config
 
   cp "$config" "$TMP"
   $EDITOR "$TMP"
@@ -144,73 +153,78 @@ edit_config()
   fi
 }
 
-add_cmdline()
+function cmdline
 {
   config
 
-  _add_cmdline()
+  function _cmdline
   {
-    if ! ((${#x})); then
+    if ! ((${#i})); then
+      die "must specify an entry"
+    fi
+    entry_$i
+
+    echo "$i| $unicode"
+  }
+
+  sub "${FUNCNAME[0]}"
+}
+
+function add_cmdline
+{
+  config
+
+  function _add_cmdline
+  {
+    if ! ((${#i})); then
       die "no entry to modify specified"
     fi
-    entry_$x
+    entry_$i
 
     origUnicode="$unicode"
     unicode="$unicode ${STRARGV[@]}"
 
     echo "${CONFIN/$origUnicode/$unicode}" >$config
-
-    if ! (($?)); then
-      echo "${STRARGV[@]}: added to cmdline"
-      exit
-    else
-      die "${STRARGV[@]}: failed to add to cmdline"
-    fi
+    echo "${STRARGV[@]}: added to cmdline"
   }
 
   sub "${FUNCNAME[0]}"
 }
 
-rm_cmdline()
+function rm_cmdline
 {
   config
 
-  _rm_cmdline()
+  function _rm_cmdline
   {
-    if ! ((${#x})); then
+    if ! ((${#i})); then
       die "no entry to modify specified"
     fi
-    entry_$x
+    entry_$i
 
     origUnicode="$unicode"
     unicode="${unicode/${STRARGV[@]}}" unicode=$(xargs <<<"$unicode")
 
     echo "${CONFIN/$origUnicode/$unicode}" >$config
-
-    if ! (($?)); then
-      echo "${STRARGV[@]}: removed from cmdline"
-      exit
-    else
-      die "${STRARGV[@]}: failed to remove from cmdline"
-    fi
+    echo "${STRARGV[@]}: removed from cmdline"
   }
 
   sub "${FUNCNAME[0]}"
 }
 
-entry_exists()
+function entry_exists
 {
   [[ "$(efibootmgr)" =~ "$label" ]]
 }
 
-create_entry()
+function create_entry
 {
   config; scripts
   cd $configDir
 
-  _create_entry()
+  function _create_entry
   {
-    entry_$x
+    entry_$i
 
     if (entry_exists) && ! (($force)); then
       die \
@@ -241,25 +255,21 @@ create_entry()
 
     echo "create: $label "
     efibootmgr -c -d "$disk" -p "$partInt" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" >>$log
-
-    if (($?)); then
-      die "$label: failed to add entry"
-    fi
   }
 
   sub "${FUNCNAME[0]}"
 }
 
-remove_entry()
+function remove_entry
 {
   config
 
-  _remove_entry()
+  function _remove_entry
   {
-    entry_$x
+    entry_$i
 
     echo "remove: $label "
-    until ! (entry_exists); do
+    while (entry_exists); do
       # head -n1 -c8 -- get first line & first 8 characters
       int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int//Boot}"
 
@@ -274,34 +284,34 @@ remove_entry()
   sub "${FUNCNAME[0]}"
 }
 
-list_entry()
+function list_entry
 {
   config
 
-  _list_entry()
+  function _list_entry
   {
-    entry_$x
+    entry_$i
 
     int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int/Boot}"
-    (entry_exists) && echo "$int|$x $label"
+    (entry_exists) && echo "$int|$i $label"
   }
 
   sub "${FUNCNAME[0]}"
 }
 
-version()
+function version
 {
   echo "stubload version $VERSION"
   echo "efibootmgr version $EVERSION"
-  exit 0
 }
 
-parse_arg()
+function parse_arg
 {
-  _arg()
+  function _arg
   {
+    declare -i i
     case "$1" in
-      "version"|"usage"|"list_entry"|"remove_entry"|"edit_config") i=1 ;;
+      "version"|"usage"|"list_entry"|"remove_entry"|"edit_config"|"cmdline") i=1 ;;
       "create_entry") i=2 ;;
       "add_cmdline"|"rm_cmdline"|"config") i=0 ;;
     esac
@@ -333,14 +343,15 @@ parse_arg()
       "--config") configArg=1; _arg "config" ;;
       "--verbose"|"-v") verbose=1 ;;
       "--version"|"-V") _arg "version" ;;
-      "--help"|"-h") _arg "usage" ;;
+      "--help"|"-h"|"-?") _arg "usage" ;;
       "--edit_config"|"-C") _arg "edit_config" ;;
+      "--cmdline"|"-G") _arg "cmdline" ;;
       "--add_cmdline"|"-A") _arg "add_cmdline" ;;
       "--rm_cmdline"|"-R") _arg "rm_cmdline" ;;
       "--list"|"-l") _arg "list_entry" ;;
       "--remove"|"-r") _arg "remove_entry" ;;
       "--create"|"-c") _arg "create_entry" ;;
-      "--"*|"-"*) die "$1: unrecognised argument" ;;
+      "--"*|"-"*) die "unrecognised option -- ${1//-}" ;;
       *) STRARGV+=( "$1" ) ;;
     esac
     shift
@@ -360,5 +371,5 @@ log="/dev/null"
 (($verbose)) && log="/dev/stdout"
 
 for func in ${ARGX[@]}; do
-  eval "$func"
+  "$func"
 done
