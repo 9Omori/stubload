@@ -24,21 +24,25 @@ Example usage
 Create entries:
 
 ``# stubload -c``
+
 ``# stubload --create``
 
 Create entries & remove previous entries:
 
 ``# stubload -cr``
+
 ``# stubload --create --remove``
 
 List entries:
 
 ``# stubload -l``
+
 ``# stubload --list``
 
 Edit the configuration file:
 
 ``# stubload -C``
+
 ``# stubload --edit_config``
 
 Prerequisites
