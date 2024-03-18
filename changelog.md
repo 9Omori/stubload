@@ -1,3 +1,7 @@
+v0.1.4:
++ Add configuration editor
++ Add cmdline additions/removals
+
 v0.1.3:
 + Improve argument parsing method (again) & general code
 + Add script functionality
@@ -9,10 +13,3 @@ v0.1.3:
 + Add entry number selection option
 + Add configuration file chooser
 + Remove debugging
-
-v0.1.2:
-+ Fix & improve argument parsing method
-+ Add more debug
-+ Add colour toggle
-+ Minor code improvements
-+ Add bash completion

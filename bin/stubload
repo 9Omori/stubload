@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
-VERSION="0.1.3-6"
-VERSION_CODE=12
-TIME="22:02"
-DATE="07/03/2024"
+# set -e -- tell shell to exit on errors
+set -e
+
+VERSION="0.1.4-1"
+VERSION_CODE=13
+TIME="01:18"
+DATE="18/03/2024"
 TZONE="gmt"
 
 EVERSION=$(efibootmgr -V) EVERSION="${EVERSION//* }"
@@ -13,12 +16,10 @@ die()
   # \e[1;31m -- change output to red
   # \e[0m -- change output to default
   # >&2 -- redirect stdout to stderr
-  echo $'\e[1;31m'"error:" $'\e[0m'"$1" >&2
-  shift
-
+  echo $'\e[1;31m'"error:" $'\e[0m'"$1" >&2 && shift
+ 
   while (($#)); do
-    echo "$1" >&2
-    shift
+    echo "$1" >&2 && shift
   done
 
   (($force)) && return 1
@@ -37,7 +38,7 @@ sub()
       eval "_$1"
     done
   else
-    let x=1
+    x=1
     until ! (execq entry_$x); do
       eval "_$1"
       let x++
@@ -47,22 +48,25 @@ sub()
 
 usage()
 {
-  # ${0##*/} -- remove everything before '/' to
+  # ${0/*\/} -- remove everything before '/' to
   # get just executable name
   echo \
 "stubload version $VERSION
-Usage: ${0##*/} [OPTION]...
+Usage: ${0/*\/} [OPTION]...
 
- -h, --help        print help & exit
- -v, --verbose     don't suppress output
- -V, --version     print version
- -l, --list        list entries
- -c, --create      create entries
- -r, --remove      remove entries
- -[n]              specify entry's number to target
+ -h, --help         print help & exit
+ -v, --verbose      don't suppress output
+ -V, --version      print version
+ -C, --config       edit configuration file
+ -A, --add_cmdline  add option to kernel cmdline
+ -R, --rm_cmdline   remove option from kernel cmdline
+ -l, --list         list entries
+ -c, --create       create entries
+ -r, --remove       remove entries
+ -[n]               specify entry's number to target
 
- --force           ignore errors
- --config [file]   specify configuration file
+ --force            ignore errors
+ --config [file]    specify configuration file
 "
 }
 
@@ -85,24 +89,22 @@ sanity_check()
   fi
 
   configDir=$(dirname $config)
+  configBase=$(basename $config)
+
   [ -d "$configDir" ] || mkdir -v $configDir
 }
 
 scripts()
 {
-  # add a '.' to the front of a script's name to disable it,
-  # it will be hidden from `ls`
+  # add a '.' to the front of a script's name to disable it
   for script in /lib/stubload/scripts/*.sh; do
-    bash "$script" >>$log
+    source "$script" >>$log
   done
 }
 
 config()
 {
-  if (($#)); then
-    sanity_check
-    config="$1"
-  fi
+  ((${#1})) && config="$1"
 
   dir() { bootDir="$1" ;}
   label() { label="$1" ;}
@@ -110,7 +112,82 @@ config()
   cmdline() { unicode="$1" ;}
   ramdisk() { ramdisk="$1" ;}
 
-  source $config || die "$config: failed to access configuration file"
+  CONFIN=$(<$config)
+
+  source "$config" || die "$config: failed to access configuration file"
+}
+
+edit_config()
+{
+  sanity_check; config
+
+  ((${#EDITOR})) || EDITOR=vi
+  TMP="$configDir/$configBase-$(date +%s).tmp"
+
+  cp $config $TMP
+  $EDITOR $TMP
+
+  if (cmp -s $config $TMP); then
+    rm -f $TMP
+    echo "$config: no changes made"
+  else
+    mv $TMP $config
+    echo "$config: saved changes"
+  fi
+}
+
+add_cmdline()
+{
+  sanity_check; config
+
+  _add_cmdline()
+  {
+    if ! ((${#x})); then
+      die "no entry to modify specified"
+    fi
+    entry_$x
+
+    origUnicode="$unicode"
+    unicode="$unicode ${STRARGV[@]}"
+
+    echo "${CONFIN/$origUnicode/$unicode}" >$config
+
+    if ! (($?)); then
+      echo "${STRARGV[@]}: added to cmdline"
+      exit
+    else
+      die "${STRARGV[@]}: failed to add to cmdline"
+    fi
+  }
+
+  sub add_cmdline
+}
+
+rm_cmdline()
+{
+  sanity_check; config
+
+  _rm_cmdline()
+  {
+    if ! ((${#x})); then
+      die "no entry to modify specified"
+    fi
+    entry_$x
+
+    origUnicode="$unicode"
+    unicode="${unicode/${STRARGV[@]}}" unicode=$(xargs <<<"$unicode")
+
+    echo "${CONFIN/$origUnicode/$unicode}" >$config
+
+    if ! (($?)); then
+      echo "${STRARGV[@]}: removed from cmdline"
+      exit
+    else
+      die "${STRARGV[@]}: failed to remove from cmdline"
+    fi
+  }
+
+  sub rm_cmdline
 }
 
 entry_exists()
@@ -162,7 +239,7 @@ create_entry()
     fi
   }
 
-  sub ${FUNCNAME[0]}
+  sub create_entry
 }
 
 remove_entry()
@@ -186,7 +263,7 @@ remove_entry()
     fi
   }
 
-  sub ${FUNCNAME[0]}
+  sub remove_entry
 }
 
 list_entry()
@@ -197,11 +274,11 @@ list_entry()
   {
     entry_$x
 
-    int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int##Boot}"
+    int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int/Boot}"
     (entry_exists) && echo "$int|$x $label"
   }
 
-  sub ${FUNCNAME[0]}
+  sub list_entry
 }
 
 version()
@@ -216,11 +293,13 @@ parse_arg()
   _arg()
   {
     case "$1" in
-      "version"|"usage"|"list_entry"|"remove_entry") i=1 ;;
+      "version"|"usage"|"list_entry"|"remove_entry"|"edit_config") i=1 ;;
       "create_entry") i=2 ;;
-      *) i=0 ;;
+      "add_cmdline"|"rm_cmdline") i=0 ;;
     esac
 
+    echo "1 = $1"
+    ((${#ARGX[$i]})) && die "conflicting arguments provided"
     ARGX[$i]="$1"
   }
 
@@ -229,8 +308,12 @@ parse_arg()
       "--"*)
         :
         ;;
+      "-"[0-9]*)
+        set -- ${@/$ARG}
+        NUMARGV+=( ${ARG/-} )
+        ;;
       "-"*)
-        for SHORTARG in $(fold -w1 <<<"${ARG//-}" | xargs); do
+        for SHORTARG in $(fold -w1 <<<"${ARG/-}" | xargs); do
           set -- "-$SHORTARG" ${@/-$SHORTARG}
         done
         ;;
@@ -243,15 +326,21 @@ parse_arg()
       "--verbose"|"-v") verbose=1 ;;
       "--version"|"-V") _arg "version" ;;
       "--help"|"-h") _arg "usage" ;;
+      "--config"|"-C") _arg "edit_config" ;;
+      "--add_cmdline"|"-A") _arg "add_cmdline" ;;
+      "--rm_cmdline"|"-R") _arg "rm_cmdline" ;;
       "--list"|"-l") _arg "list_entry" ;;
       "--remove"|"-r") _arg "remove_entry" ;;
       "--create"|"-c") _arg "create_entry" ;;
       "--"*|"-"*) die "$1: unrecognised argument" ;;
+      *) STRARGV+=( "$1" ) ;;
     esac
     shift
   done
 
   ((${#ARGX[@]})) || _arg "usage"
+
+  unset _arg
 }
 
 ((${#config})) || config="/etc/efistub/stubload.conf"
@@ -259,11 +348,8 @@ void=/dev/null
 
 parse_arg $@
 
-if (($verbose)); then
-  log="/dev/stdout"
-else
-  log="/dev/null"
-fi
+log="/dev/null"
+(($verbose)) && log="/dev/stdout"
 
 for func in ${ARGX[@]}; do
   eval "$func"

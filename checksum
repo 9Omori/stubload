@@ -22,3 +22,8 @@ f553f1e1918961618903164fedf7d937b55595aa  etc/completion.sh
 ab3d2ed8d0bddd1636bfd2cb8263aba02ee66122  bin/stubload.sh
 5b89ced9ed445b51c2b8eee653693cf8ac4f4ac7  etc/stubload.conf
 44c7e4205cd221e82dc5397f76ffbfb1343d3c29  etc/completion.sh
+
+# 01:18[GMT] | 18/03/2024
+e206b44654d270886d481a784c092cd63336639f  bin/stubload
+6c72a770b420257f46527b62e8166f6a18f05677  etc/stubload.conf
+44c7e4205cd221e82dc5397f76ffbfb1343d3c29  etc/completion

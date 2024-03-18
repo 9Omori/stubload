@@ -1,7 +1,8 @@
-#!/usr/bin/env -S bash -e
+#!/usr/bin/env bash
+set -e
 
-VERSION="0.1.3"
-FULL_VERSION="0.1.3-6"
+VERSION="0.1.4"
+FULL_VERSION="0.1.4-1"
 
 die()
 {
@@ -15,54 +16,47 @@ PKGS=(rpm git tar zstd gzip)
 BUILD="$PWD/build"
 OUT="$BUILD/out"
 
+STRUCTURES=(deb/build rpmbuild rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} tar)
+
 if (($UID)); then
   sudo $0 $@
   exit
 fi
 
-sanity_check()
-{
-  [ -d "$BUILD" ] || mkdir -v "$BUILD"
-
-  if (! command -v apt >/dev/null); then
-    die "apt not found, build.sh must be ran on a Debian-based distro"
-  fi
-
-  if [ ! -d ".git" ]; then
-    die "build.sh must be ran in the GitHub repository"
-  fi
-}
+[ -d "$BUILD" ] || mkdir -v "$BUILD"
+[ -d ".git" ] || die "build.sh must be ran in the GitHub repository"
 
 structure()
 {
   cd $BUILD
 
-  mkdir -p -v \
-    ./deb/build/ \
-    ./rpmbuild/ ./rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} \
-    ./tar/
-  mkdir -v $OUT
-}
-
-setup_repo()
-{
-  cd $BUILD
+  mkdir -p -v "${STRUCTURES[@]}"
+  mkdir -v "$OUT"
+  
   ln -s .. source
 }
 
 dependencies()
 {
-  apt update
-  apt install -y "${PKGS[@]}"
+  apt update ||
+    dnf makecache ||
+    pacman -Sy ||
+    emerge --ask --sync
+  
+  for PKG in ${PKGS[@]}; do
+    if (! command -v "$PKG"); then
+      apt install "$PKG" ||
+        dnf install "$PKG" ||
+        pacman -S "$PKG" ||
+        emerge --ask "$PKG"
+    fi
+  done
 }
 
 environment()
 {
-  echo "Format: DEB"
+  echo "** Format: DEB"
   {
-    cd $BUILD/deb
-    ln -s ../source .
-
     cd $BUILD/deb/build
 
     mkdir -p -v \
@@ -73,31 +67,31 @@ environment()
       lib/stubload/scripts
 
     cp -v $BUILD/source/.github/build/deb/control DEBIAN/control
-    cp -v $BUILD/source/bin/stubload.sh usr/bin/stubload
-    cp -v $BUILD/source/etc/completion.sh usr/share/bash-completions/stubload
+    cp -v $BUILD/source/bin/stubload usr/bin/stubload
+    cp -v $BUILD/source/etc/completion usr/share/bash-completions/completions/stubload
 
     chmod +x usr/bin/stubload
     chown -R root:root etc/efistub
     chmod 700 etc/efistub
   }
 
-  echo "Format: RPM"
+  echo "** Format: RPM"
   {
     cd $BUILD/rpmbuild
 
     mkdir -p -v stubload-$VERSION
     ln -s stubload-$VERSION stubload
     cp -v $BUILD/source/.github/build/rpm/stubload.spec SPECS/
-    cp -v $BUILD/source/bin/stubload.sh $BUILD/source/etc/completion.sh stubload/
+    cp -v $BUILD/source/bin/stubload $BUILD/source/etc/completion stubload/
 
-    chmod +x ./stubload/stubload.sh
+    chmod +x ./stubload/stubload
     chown -R root:root stubload
     chmod 700 stubload
 
     tar --gzip -cvf ./SOURCES/stubload-$VERSION.tgz ./stubload-$VERSION
   }
 
-  echo "Format: TAR"
+  echo "** Format: TAR"
   {
     cd $BUILD/tar
 
@@ -107,8 +101,8 @@ environment()
       usr/share/bash-completion/completions \
       lib/stubload/scripts
 
-    cp -v ../source/bin/stubload.sh ./usr/bin/stubload
-    cp -v ../source/etc/completion.sh ./usr/share/bash-completion/completions/stubload
+    cp -v ../source/bin/stubload ./usr/bin/stubload
+    cp -v ../source/etc/completion ./usr/share/bash-completion/completions/stubload
 
     chmod +x ./usr/bin/stubload
     chown -R root:root etc/efistub
@@ -120,21 +114,21 @@ environment()
 
 build_package()
 {
-  echo "Format: DEB"
+  echo "** Format: DEB"
   {
     cd $BUILD/deb/build
     dpkg-deb --root-owner-group --build $PWD
     mv -v ../*.deb $OUT
   }
 
-  echo "Format: RPM"
+  echo "** Format: RPM"
   {
     cd $BUILD/rpmbuild
     HOME=$BUILD rpmbuild -bb SPECS/stubload.spec
     mv -v RPMS/noarch/*.rpm $OUT
   }
 
-  echo "Format: TAR"
+  echo "** Format: TAR"
   {
     cd $BUILD/tar
     tar --zstd -cvf stubload.tzst *
@@ -154,23 +148,20 @@ build_package()
   exit 0
 }
 
-while (($#)); do
-  case "$1" in
-    "--all"|"-")
-      sanity_check
-      setup_repo
-      structure
-      dependencies
-      environment
-      build_package
-      ;;
-    "--"*)
-      sanity_check
-      ${1/--}
-      ;;
-    *)
-      die "unrecognised argument -- ${1//-}"
-      ;;
-  esac
-  shift
-done
+case "$1" in
+  "--all"|"-")
+    structure
+    dependencies
+    environment
+    build_package
+    ;;
+  "--"*)
+    ${1/--}
+    ;;
+  "")
+    die "insufficient arguments (use '--all'/'-' to build)"
+    ;;
+  *)
+    die "unrecognised argument -- ${1//-}"
+    ;;
+esac

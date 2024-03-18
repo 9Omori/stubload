@@ -3,8 +3,8 @@ name: Package
 on:
   push:
     paths:
-      - 'bin/stubload.sh'
-      - 'etc/completion.sh'
+      - 'bin/stubload'
+      - 'etc/completion'
       - 'etc/stubload.conf'
       - 'build.sh'
       - '.github/workflows/make-pkg.yml'
@@ -24,7 +24,6 @@ jobs:
       run: |
         cd ~/stubload
         ./build.sh --structure
-        ./build.sh --setup_repo
       
     - name: Install dependencies
       run: |
