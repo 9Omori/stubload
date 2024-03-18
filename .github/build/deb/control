@@ -1,9 +1,0 @@
-Package: stubload
-Version: 0.1.4-1
-Section: utils
-Priority: optional
-Architecture: all
-Maintainer: basil <118671833+9Omori@users.noreply.github.com>
-Description: a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel
-Depends: bash, efibootmgr, coreutils, grep, ncurses-bin
-Recommends: sudo

@@ -2,7 +2,7 @@
 set -e
 
 VERSION="0.1.4"
-FULL_VERSION="0.1.4-1"
+FULL_VERSION="0.1.4-2"
 
 die()
 {
@@ -25,6 +25,66 @@ fi
 
 [ -d "$BUILD" ] || mkdir -v "$BUILD"
 [ -d ".git" ] || die "build.sh must be ran in the GitHub repository"
+
+rpm_spec()
+{
+  echo \
+'
+Name: stubload
+Version: 0.1.4
+Release: 1%{?dist}
+Summary: a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel
+BuildArch: noarch
+
+License: GPL
+Source0: %{name}-%{version}.tgz
+
+Requires: bash efibootmgr coreutils grep ncurses
+
+%description
+%{summary}
+
+%prep
+%setup -q
+
+%install
+mkdir -p $RPM_BUILD_ROOT/usr/bin
+mkdir -p $RPM_BUILD_ROOT/etc/efistub
+mkdir -p $RPM_BUILD_ROOT/usr/share/bash-completion/completions
+mkdir -p $RPM_BUILD_ROOT/lib/stubload/scripts
+cp %{name} $RPM_BUILD_ROOT/usr/bin/%{name}
+cp completion $RPM_BUILD_ROOT/usr/share/bash-completion/completions/%{name}
+cp -a presets $RPM_BUILD_ROOT/lib/stubload/presets
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+/usr/bin/%{name}
+/usr/share/bash-completion/completions/%{name}
+/lib/stubload/presets/arch
+/lib/stubload/presets/arch-fallback
+/lib/stubload/presets/debian
+/lib/stubload/presets/fedora
+/lib/stubload/presets/fedora-rescue
+'
+}
+
+deb_control()
+{
+  echo \
+'
+Package: stubload
+Version: 0.1.4-1
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: basil <118671833+9Omori@users.noreply.github.com>
+Description: a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel
+Depends: bash, efibootmgr, coreutils, grep, ncurses-bin
+Recommends: sudo
+'
+}
 
 structure()
 {
@@ -66,9 +126,10 @@ environment()
       usr/share/bash-completions/completions \
       lib/stubload/scripts
 
-    cp -v $BUILD/source/.github/build/deb/control DEBIAN/control
-    cp -v $BUILD/source/bin/stubload usr/bin/stubload
-    cp -v $BUILD/source/etc/completion usr/share/bash-completions/completions/stubload
+    deb_control >./DEBIAN/control
+    cp -v $BUILD/source/bin/stubload ./usr/bin/stubload
+    cp -v $BUILD/source/etc/completion ./usr/share/bash-completions/completions/stubload
+    cp -v -a $BUILD/source/lib/presets ./lib/stubload/presets
 
     chmod +x usr/bin/stubload
     chown -R root:root etc/efistub
@@ -81,8 +142,10 @@ environment()
 
     mkdir -p -v stubload-$VERSION
     ln -s stubload-$VERSION stubload
-    cp -v $BUILD/source/.github/build/rpm/stubload.spec SPECS/
+
+    rpm_spec >./SPECS/stubload.spec
     cp -v $BUILD/source/bin/stubload $BUILD/source/etc/completion stubload/
+    cp -v -a $BUILD/source/lib/presets stubload/presets
 
     chmod +x ./stubload/stubload
     chown -R root:root stubload
@@ -103,6 +166,7 @@ environment()
 
     cp -v ../source/bin/stubload ./usr/bin/stubload
     cp -v ../source/etc/completion ./usr/share/bash-completion/completions/stubload
+    cp -v -a ../source/lib/presets ./lib/stubload/presets
 
     chmod +x ./usr/bin/stubload
     chown -R root:root etc/efistub

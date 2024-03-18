@@ -3,13 +3,13 @@
 # set -e -- tell shell to exit on errors
 set -e
 
-VERSION="0.1.4-1"
-VERSION_CODE=13
-TIME="01:18"
+VERSION="0.1.4-2"
+VERSION_CODE=14
+TIME="18:10"
 DATE="18/03/2024"
 TZONE="gmt"
 
-EVERSION=$(efibootmgr -V) EVERSION="${EVERSION//* }"
+EVERSION=$(efibootmgr -V) EVERSION="${EVERSION/* }"
 
 die()
 {
@@ -54,44 +54,20 @@ usage()
 "stubload version $VERSION
 Usage: ${0/*\/} [OPTION]...
 
- -h, --help         print help & exit
- -v, --verbose      don't suppress output
- -V, --version      print version
- -C, --config       edit configuration file
- -A, --add_cmdline  add option to kernel cmdline
- -R, --rm_cmdline   remove option from kernel cmdline
- -l, --list         list entries
- -c, --create       create entries
- -r, --remove       remove entries
- -[n]               specify entry's number to target
+ -h, --help          print help & exit
+ -v, --verbose       don't suppress output
+ -V, --version       print version
+ -C, --edit_config   edit configuration file
+ -A, --add_cmdline   add option to kernel cmdline
+ -R, --rm_cmdline    remove option from kernel cmdline
+ -l, --list          list entries
+ -c, --create        create entries
+ -r, --remove        remove entries
+ -[n]                specify entry's number to target
 
- --force            ignore errors
- --config [file]    specify configuration file
+ --force             ignore errors
+ --config [file]     specify configuration file
 "
-}
-
-sanity_check()
-{
-  # BASH_VERSINFO[0] -- get 'x' from bash version x.y.z (e.g. 5 from 5.2.26)
-  if ((${BASH_VERSINFO[0]} < 5)); then
-    die "stubload is only compatible with bash version 5 and up"
-  fi
-
-  # -r -- test read permission for file
-  if [ ! -r "$config" ]; then
-    die "insufficient permissions"
-  fi
-
-  # /sys/firmware/efi -- kernel interface to EFI variables
-  if (! eval efibootmgr >$void) || [ ! -d "/sys/firmware/efi" ]; then
-    die \
-      "failed to read EFI variables, either your device is unsupported or you need to mount EFIvars"
-  fi
-
-  configDir=$(dirname $config)
-  configBase=$(basename $config)
-
-  [ -d "$configDir" ] || mkdir -v $configDir
 }
 
 scripts()
@@ -102,15 +78,47 @@ scripts()
   done
 }
 
+preset()
+{
+  PRESET="$1"; shift
+  source /lib/stubload/presets/"$PRESET" >>$log
+}
+
 config()
 {
-  ((${#1})) && config="$1"
+  if (($configArg)) && ((${#STRARGV[@]})); then
+    config="${STRARGV[0]}"
+    STRARGV="${STRARGV[@]/$config}"
+  elif (($configArg)); then
+    die "configuration file expected"
+  fi
+
+  configDir=$(dirname $config)
+  configBase=$(basename $config)
+
+  [ -d "$configDir" ] || mkdir -v $configDir
+
+  target()
+  {
+    if [[ "$1" == "-p" || "$1" == "--preset" ]]; then
+      preset "$2"
+    else
+      target="$1"
+    fi
+  }
+
+  ramdisk()
+  {
+    if [[ "$1" == "-p" || "$1" == "--preset" ]]; then
+      preset "$2"
+    else
+      ramdisk="$1"
+    fi
+  }
 
   dir() { bootDir="$1" ;}
   label() { label="$1" ;}
-  target() { target="$1" ;}
   cmdline() { unicode="$1" ;}
-  ramdisk() { ramdisk="$1" ;}
 
   CONFIN=$(<$config)
 
@@ -119,26 +127,26 @@ config()
 
 edit_config()
 {
-  sanity_check; config
+  config
 
   ((${#EDITOR})) || EDITOR=vi
   TMP="$configDir/$configBase-$(date +%s).tmp"
 
-  cp $config $TMP
-  $EDITOR $TMP
+  cp "$config" "$TMP"
+  $EDITOR "$TMP"
 
   if (cmp -s $config $TMP); then
-    rm -f $TMP
+    rm -f "$TMP"
     echo "$config: no changes made"
   else
-    mv $TMP $config
+    mv "$TMP" "$config"
     echo "$config: saved changes"
   fi
 }
 
 add_cmdline()
 {
-  sanity_check; config
+  config
 
   _add_cmdline()
   {
@@ -160,12 +168,12 @@ add_cmdline()
     fi
   }
 
-  sub add_cmdline
+  sub "${FUNCNAME[0]}"
 }
 
 rm_cmdline()
 {
-  sanity_check; config
+  config
 
   _rm_cmdline()
   {
@@ -187,7 +195,7 @@ rm_cmdline()
     fi
   }
 
-  sub rm_cmdline
+  sub "${FUNCNAME[0]}"
 }
 
 entry_exists()
@@ -197,7 +205,7 @@ entry_exists()
 
 create_entry()
 {
-  sanity_check; config; scripts
+  config; scripts
   cd $configDir
 
   _create_entry()
@@ -239,12 +247,12 @@ create_entry()
     fi
   }
 
-  sub create_entry
+  sub "${FUNCNAME[0]}"
 }
 
 remove_entry()
 {
-  sanity_check; config
+  config
 
   _remove_entry()
   {
@@ -263,12 +271,12 @@ remove_entry()
     fi
   }
 
-  sub remove_entry
+  sub "${FUNCNAME[0]}"
 }
 
 list_entry()
 {
-  sanity_check; config
+  config
 
   _list_entry()
   {
@@ -278,7 +286,7 @@ list_entry()
     (entry_exists) && echo "$int|$x $label"
   }
 
-  sub list_entry
+  sub "${FUNCNAME[0]}"
 }
 
 version()
@@ -295,7 +303,7 @@ parse_arg()
     case "$1" in
       "version"|"usage"|"list_entry"|"remove_entry"|"edit_config") i=1 ;;
       "create_entry") i=2 ;;
-      "add_cmdline"|"rm_cmdline") i=0 ;;
+      "add_cmdline"|"rm_cmdline"|"config") i=0 ;;
     esac
 
     ((${#ARGX[$i]})) && die "conflicting arguments provided"
@@ -322,10 +330,11 @@ parse_arg()
   while (($#)); do
     case "$1" in
       "--force") force=1 ;;
+      "--config") configArg=1; _arg "config" ;;
       "--verbose"|"-v") verbose=1 ;;
       "--version"|"-V") _arg "version" ;;
       "--help"|"-h") _arg "usage" ;;
-      "--config"|"-C") _arg "edit_config" ;;
+      "--edit_config"|"-C") _arg "edit_config" ;;
       "--add_cmdline"|"-A") _arg "add_cmdline" ;;
       "--rm_cmdline"|"-R") _arg "rm_cmdline" ;;
       "--list"|"-l") _arg "list_entry" ;;

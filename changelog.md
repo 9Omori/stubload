@@ -1,6 +1,8 @@
 v0.1.4:
 + Add configuration editor
 + Add cmdline additions/removals
++ Add presets
++ Fix duplicate '--config' arguments
 
 v0.1.3:
 + Improve argument parsing method (again) & general code
