@@ -298,7 +298,6 @@ parse_arg()
       "add_cmdline"|"rm_cmdline") i=0 ;;
     esac
 
-    echo "1 = $1"
     ((${#ARGX[$i]})) && die "conflicting arguments provided"
     ARGX[$i]="$1"
   }
