@@ -1,0 +1,5 @@
+# -E -o "\-.*fc[0-9].*.$(uname -m)" -- look for regex pattern '-VERSION.fcFEDORA_VERSION.ARCH'
+VERSION=$(ls $bootDir | grep -E -o "\-[0-9].*.fc[0-9].*.$(uname -m)" | head -n1) VERSION="${VERSION#-}"
+
+target "vmlinuz-$VERSION"
+ramdisk "initramfs-$VERSION.img"

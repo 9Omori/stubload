@@ -1,0 +1,7 @@
+# -E -o "\-[0-9].*-[a-z].*" -- look for '-VERSION-ARCH'
+VERSION=$(ls $bootDir | grep -E -o "\-[0-9].*-[a-z].*" | head -n1) VERSION="${VERSION#-}"
+
+[ -f "$bootDir/vmlinuz" ] && unset VERSION
+
+target "vmlinuz-$VERSION"
+ramdisk "initrd.img-$VERSION"

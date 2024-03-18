@@ -1,0 +1,2 @@
+target "vmlinuz-linux"
+ramdisk "initramfs-linux.img"
