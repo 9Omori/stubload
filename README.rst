@@ -66,12 +66,8 @@ would like to help with making the ‘PKGBUILD’, then also please create
 an issue
 
 After installation, you will need a configuration file in
-``/etc/efistub/stubload.conf`` or use ``stubload -C`` to download & edit
-the configuration file
-
-See
-`here <https://github.com/9Omori/stubload/blob/main/etc/stubload.conf>`__
-for an example configuration
+``/etc/efistub/stubload.conf``. You can find an example of
+this configuration file `here <https://github.com/9Omori/stubload/blob/main/etc/stubload.conf>`__.
 
 Building
 --------

@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 
-# set -e -- tell shell to exit on errors
-set -e
+# errexit -- exit on errors
+set -o errexit
 
-VERSION="0.1.4-2"
-VERSION_CODE=14
-TIME="18:10"
-DATE="18/03/2024"
+VERSION="0.1.4-3"
+VERSION_CODE=15
+TIME="17:13"
+DATE="23/03/2024"
 TZONE="gmt"
-
-REPO="9Omori/stubload"
 
 EVERSION=$(efibootmgr -V) EVERSION="${EVERSION/* }"
 
@@ -21,13 +19,15 @@ function die
   local none=$'\e[0m'
 
   # >&2 -- redirect stdout to stderr
-  echo $red"error:"$none "$1" >&2 && shift
- 
+  echo $red"error:"$none "$1" >&2; shift
+
   while (($#)); do
-    echo "$1" >&2 && shift
+    echo "$1" >&2; shift
   done
 
-  (($force)) || return 1
+  if ! (($force)); then
+    return 1
+  fi
 }
 
 function execq
@@ -43,6 +43,7 @@ function sub
       _$1
     done
   else
+    # declare -i -- set integer variable
     declare -i i=1
     while (execq entry_$i); do
       _$1
@@ -79,7 +80,7 @@ Usage: ${0/*\/} [OPTION]...
 function scripts
 {
   # add a '.' to the front of a script's name to disable it
-  for script in /lib/stubload/scripts/*.sh; do
+  for script in $(ls -1 -d /lib/stubload/scripts/*.sh 2>/dev/null); do
     source "$script" >>$log
   done
 }
@@ -132,14 +133,10 @@ function config
 
 function edit_config
 {
+  config
+
   ((${#EDITOR})) || EDITOR=vi
   TMP="$configDir/$configBase-$(date +%s).tmp"
-
-  if ! [ -f "$config" ]; then
-    curl -Ls https://raw.githubusercontent.com/$REPO/main/etc/stubload.conf -o /etc/efistub/stubload.conf
-    echo "$config: downloaded config file"
-  fi
-  config
 
   cp "$config" "$TMP"
   $EDITOR "$TMP"
@@ -212,9 +209,24 @@ function rm_cmdline
   sub "${FUNCNAME[0]}"
 }
 
+function match_entry
+{
+  EFIDUMP=$(efibootmgr | xargs)
+  BOOTINTS=$(grep -E -o "Boot[0-9]{4}\*" <<<"$EFIDUMP")
+
+  for bootint in ${BOOTINTS[@]}; do
+    if (grep -q -F -o "$bootint $label HD(" <<<"$EFIDUMP"); then
+      int="${bootint//[!0-9]}"
+      break
+    fi
+  done
+}
+
 function entry_exists
 {
-  [[ "$(efibootmgr)" =~ "$label" ]]
+  unset int EFIDUMP BOOTNUMS
+  match_entry
+  ((${#int} == 4))
 }
 
 function create_entry
@@ -236,15 +248,15 @@ function create_entry
     part=$(grep " $bootDir " </proc/mounts); part="${part// *}"
     local part="$part"
 
-    case "$part" in
-      "/dev/nvme"*|"/dev/mmcblk"*)
+    case "${part#/dev/}" in
+      "nvme"*|"mmcblk"*)
         # '//p*' -- remove 'p' & everything after 'p'
         # '//*p' -- remove 'p' & everything before 'p'
         local disk="${part//p*}"
         local partInt="${part//*p}"
         ;;
-      "/dev/sd"*)
-        # '//![0-9]' -- remove all non-numbers
+      "sd"*)
+        # '//[!0-9]' -- remove all non-numbers
         local disk="${part//sd*}"
         local partInt="${part//[!0-9]}"
         ;;
@@ -270,10 +282,11 @@ function remove_entry
 
     echo "remove: $label "
     while (entry_exists); do
-      # head -n1 -c8 -- get first line & first 8 characters
-      int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int//Boot}"
+      match_entry
 
-      ((${#int})) && efibootmgr -B -b "$int" | grep "$label" >>$log
+      if ((${#int} == 4)); then
+        efibootmgr -B -b "$int" >>$log
+      fi
     done
 
     if (entry_exists); then

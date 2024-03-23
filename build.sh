@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-set -e
+set -o errexit
 
 VERSION="0.1.4"
-FULL_VERSION="0.1.4-2"
+FULL_VERSION="0.1.4-3"
 
 die()
 {
-  echo $'\e[1;31m'"error:" $'\e[0m'"$1" >&2
+  local red=$'\e[1;31m'
+  local none=$'\e[0m'
+
+  echo $red"error:"$none "$1" >&2
   exit 1
 }
 
