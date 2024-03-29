@@ -25,25 +25,17 @@ Create entries:
 
 ``# stubload -c``
 
-``# stubload --create``
-
 Create entries & remove previous entries:
 
 ``# stubload -cr``
-
-``# stubload --create --remove``
 
 List entries:
 
 ``# stubload -l``
 
-``# stubload --list``
-
 Edit the configuration file:
 
 ``# stubload -C``
-
-``# stubload --edit_config``
 
 Prerequisites
 -------------
@@ -76,13 +68,13 @@ To build for RPM/DEB/TZST, you can either:
 
 1) Fork this repository, and run the ‘make-pkg.yml’ GitHub workflow or
 
-2) Clone this repository, run ‘./build.sh -’
+2) Clone this repository and run ‘./build.sh -’
 
 Credits
 -------
 
-`efibootmgr <https://github.com/rhboot/efibootmgr>`__
+`efibootmgr <https://github.com/rhboot/efibootmgr>`__ - the tool used to modify EFIvars
 
-`bash <https://www.gnu.org/software/bash/>`__
+`bash <https://www.gnu.org/software/bash/>`__ - the scripting language used
 
-`Linux <https://www.kernel.org/>`__
+`Linux <https://www.kernel.org/>`__ - for existing

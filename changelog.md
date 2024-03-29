@@ -4,6 +4,7 @@ v0.1.4:
 + Add presets
 + Fix duplicate '--config' arguments
 + Fix entry identification
++ Add prompt option
 
 v0.1.3:
 + Improve argument parsing method (again) & general code

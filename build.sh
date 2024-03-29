@@ -1,16 +1,27 @@
 #!/usr/bin/env bash
+
+# exit on errors
 set -o errexit
 
-VERSION="0.1.4"
-FULL_VERSION="0.1.4-3"
+# print executed commands
+set -o xtrace
 
-die()
+meta()
+{
+  VERSION='0.1.4'
+  FULL_VERSION='0.1.4-4'
+  DESCRIPTION="a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel"
+  FEDORA_DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep' 'ncurses')
+  DEBIAN_DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep' 'ncurses-bin')
+}
+
+fatal()
 {
   local red=$'\e[1;31m'
   local none=$'\e[0m'
 
   echo $red"error:"$none "$1" >&2
-  exit 1
+  return 1
 }
 
 GIT_REPO='https://github.com/9Omori/stubload.git'
@@ -21,28 +32,30 @@ OUT="$BUILD/out"
 
 STRUCTURES=(deb/build rpmbuild rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} tar)
 
-if (($UID)); then
+# root UID = 0
+if (($UID > 0)); then
   sudo $0 $@
   exit
 fi
 
-[ -d "$BUILD" ] || mkdir -v "$BUILD"
-[ -d ".git" ] || die "build.sh must be ran in the GitHub repository"
+[ -d "$BUILD" ] || mkdir "$BUILD"
+[ -d ".git" ] || fatal "build.sh must be ran in the GitHub repository"
 
 rpm_spec()
 {
-  echo \
-'
+  meta
+  echo >&1 \
+"\
 Name: stubload
-Version: 0.1.4
+Version: $VERSION
 Release: 1%{?dist}
-Summary: a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel
+Summary: $DESCRIPTION
 BuildArch: noarch
 
 License: GPL
 Source0: %{name}-%{version}.tgz
 
-Requires: bash efibootmgr coreutils grep ncurses
+Requires: ${FEDORA_DEPENDENCIES[*]}
 
 %description
 %{summary}
@@ -51,16 +64,17 @@ Requires: bash efibootmgr coreutils grep ncurses
 %setup -q
 
 %install
-mkdir -p $RPM_BUILD_ROOT/usr/bin
-mkdir -p $RPM_BUILD_ROOT/etc/efistub
-mkdir -p $RPM_BUILD_ROOT/usr/share/bash-completion/completions
-mkdir -p $RPM_BUILD_ROOT/lib/stubload/scripts
-cp %{name} $RPM_BUILD_ROOT/usr/bin/%{name}
-cp completion $RPM_BUILD_ROOT/usr/share/bash-completion/completions/%{name}
-cp -a presets $RPM_BUILD_ROOT/lib/stubload/presets
+mkdir -p \$RPM_BUILD_ROOT/usr/bin
+mkdir -p \$RPM_BUILD_ROOT/etc/efistub
+mkdir -p \$RPM_BUILD_ROOT/usr/share/bash-completion/completions
+mkdir -p \$RPM_BUILD_ROOT/lib/stubload/scripts
+cp %{name} \$RPM_BUILD_ROOT/usr/bin/%{name}
+cp completion \$RPM_BUILD_ROOT/usr/share/bash-completion/completions/%{name}
+cp -a presets \$RPM_BUILD_ROOT/lib/stubload/presets
+cp config.sh \$RPM_BUILD_ROOT/lib/stubload/config.sh
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf \$RPM_BUILD_ROOT
 
 %files
 /usr/bin/%{name}
@@ -70,47 +84,49 @@ rm -rf $RPM_BUILD_ROOT
 /lib/stubload/presets/debian
 /lib/stubload/presets/fedora
 /lib/stubload/presets/fedora-rescue
-'
+/lib/stubload/config.sh\
+"
 }
 
 deb_control()
 {
-  echo \
-'
+  meta
+  echo >&1 \
+"\
 Package: stubload
-Version: 0.1.4-1
+Version: $FULL_VERSION
 Section: utils
 Priority: optional
 Architecture: all
 Maintainer: basil <118671833+9Omori@users.noreply.github.com>
-Description: a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel
-Depends: bash, efibootmgr, coreutils, grep, ncurses-bin
-Recommends: sudo
-'
+Description: $DESCRIPTION
+Depends: ${DEBIAN_DEPENDENCIES// /,}
+Recommends: sudo\
+"
 }
 
 structure()
 {
   cd $BUILD
 
-  mkdir -p -v "${STRUCTURES[@]}"
-  mkdir -v "$OUT"
+  mkdir -p "${STRUCTURES[@]}"
+  mkdir "$OUT"
   
   ln -s .. source
 }
 
 dependencies()
 {
-  apt update ||
-    dnf makecache ||
-    pacman -Syy ||
+  apt -y update ||
+    dnf -y makecache ||
+    pacman --noconfirm -Syy ||
     emerge --ask --sync
   
   for PKG in ${PKGS[@]}; do
-    if (! command -v "$PKG"); then
-      apt install "$PKG" ||
-        dnf install "$PKG" ||
-        pacman -S "$PKG" ||
+    if (! command -v "$PKG" >/dev/null); then
+      apt -y install "$PKG" ||
+        dnf -y install "$PKG" ||
+        pacman --noconfirm -S "$PKG" ||
         emerge --ask "$PKG"
     fi
   done
@@ -118,11 +134,11 @@ dependencies()
 
 environment()
 {
-  echo "** Format: DEB"
+  echo "-- Format: DEB"
   {
     cd $BUILD/deb/build
 
-    mkdir -p -v \
+    mkdir -p \
       DEBIAN \
       usr/bin \
       etc/efistub \
@@ -130,89 +146,86 @@ environment()
       lib/stubload/scripts
 
     deb_control >./DEBIAN/control
-    cp -v $BUILD/source/bin/stubload ./usr/bin/stubload
-    cp -v $BUILD/source/etc/completion ./usr/share/bash-completions/completions/stubload
-    cp -v -a $BUILD/source/lib/presets ./lib/stubload/presets
+    cp $BUILD/source/bin/stubload ./usr/bin/stubload
+    cp $BUILD/source/etc/completion ./usr/share/bash-completions/completions/stubload
+    cp -a $BUILD/source/lib/presets ./lib/stubload/presets
+    cp $BUILD/source/lib/config.sh ./lib/stubload/config.sh
 
     chmod +x usr/bin/stubload
     chown -R root:root etc/efistub
     chmod 700 etc/efistub
   }
 
-  echo "** Format: RPM"
+  echo "-- Format: RPM"
   {
     cd $BUILD/rpmbuild
 
-    mkdir -p -v stubload-$VERSION
+    mkdir -p stubload-$VERSION
     ln -s stubload-$VERSION stubload
 
     rpm_spec >./SPECS/stubload.spec
-    cp -v $BUILD/source/bin/stubload $BUILD/source/etc/completion stubload/
-    cp -v -a $BUILD/source/lib/presets stubload/presets
+    cp $BUILD/source/bin/stubload $BUILD/source/etc/completion stubload/
+    cp -a $BUILD/source/lib/presets stubload/presets
+    cp $BUILD/source/lib/config.sh stubload/config.sh
 
     chmod +x ./stubload/stubload
     chown -R root:root stubload
     chmod 700 stubload
 
-    tar --gzip -cvf ./SOURCES/stubload-$VERSION.tgz ./stubload-$VERSION
+    tar --gzip -cf ./SOURCES/stubload-$VERSION.tgz ./stubload-$VERSION
   }
 
-  echo "** Format: TAR"
+  echo "-- Format: TAR"
   {
     cd $BUILD/tar
 
-    mkdir -p -v \
+    mkdir -p \
       usr/bin \
       etc/efistub \
       usr/share/bash-completion/completions \
       lib/stubload/scripts
 
-    cp -v ../source/bin/stubload ./usr/bin/stubload
-    cp -v ../source/etc/completion ./usr/share/bash-completion/completions/stubload
-    cp -v -a ../source/lib/presets ./lib/stubload/presets
+    cp ../source/bin/stubload ./usr/bin/stubload
+    cp ../source/etc/completion ./usr/share/bash-completion/completions/stubload
+    cp -a ../source/lib/presets ./lib/stubload/presets
+    cp ../source/lib/config.sh ./lib/stubload/config.sh
 
     chmod +x ./usr/bin/stubload
     chown -R root:root etc/efistub
     chmod 700 etc/efistub
 
-    rm -r -f -v $(ls -A | sed 's/usr//; s/etc//')
+    rm -r -f $(ls -A | sed 's/usr//; s/etc//')
   }
 }
 
 build_package()
 {
-  echo "** Format: DEB"
+  echo "-- Format: DEB"
   {
     cd $BUILD/deb/build
     dpkg-deb --root-owner-group --build $PWD
-    mv -v ../*.deb $OUT
+    mv ../*.deb $OUT
   }
 
-  echo "** Format: RPM"
+  echo "-- Format: RPM"
   {
     cd $BUILD/rpmbuild
     HOME=$BUILD rpmbuild -bb SPECS/stubload.spec
-    mv -v RPMS/noarch/*.rpm $OUT
+    mv RPMS/noarch/*.rpm $OUT
   }
 
-  echo "** Format: TAR"
+  echo "-- Format: TAR"
   {
     cd $BUILD/tar
-    tar --zstd -cvf stubload.tzst *
-    mv -v *.tzst $OUT
+    tar --zstd -cf stubload.tzst *
+    mv *.tzst $OUT
   }
 
   for pkg in $OUT/*.{rpm,deb,tzst}; do
     pkgformat="${pkg/*.}"
     new="stubload-$FULL_VERSION.allarch.$pkgformat"
-    mv -v $pkg $OUT/$new
+    mv $pkg $OUT/$new
   done
-
-  echo "Output: "
-  for OUTFILE in $OUT/*; do
-    echo " * $OUTFILE"
-  done
-  exit 0
 }
 
 case "$1" in
@@ -226,9 +239,9 @@ case "$1" in
     ${1/--}
     ;;
   "")
-    die "insufficient arguments (use '--all'/'-' to build)"
+    fatal "insufficient arguments (use '--all'/'-' to build)"
     ;;
   *)
-    die "unrecognised argument -- ${1//-}"
+    fatal "unrecognised argument -- ${1##-}"
     ;;
 esac

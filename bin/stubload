@@ -3,15 +3,7 @@
 # errexit -- exit on errors
 set -o errexit
 
-VERSION="0.1.4-3"
-VERSION_CODE=15
-TIME="17:13"
-DATE="23/03/2024"
-TZONE="gmt"
-
-EVERSION=$(efibootmgr -V) EVERSION="${EVERSION/* }"
-
-function die
+fatal()
 {
   # \e[1;31m -- change output to red
   # \e[0m -- change output to default
@@ -19,50 +11,92 @@ function die
   local none=$'\e[0m'
 
   # >&2 -- redirect stdout to stderr
-  echo $red"error:"$none "$1" >&2; shift
+  echo $red"error:"$none "$@"
 
-  while (($#)); do
-    echo "$1" >&2; shift
-  done
-
-  if ! (($force)); then
+  if ! [ "$force" == true ]; then
     return 1
   fi
 }
 
-function execq
+match_entry()
 {
-  command -v "$1" >$void
-  return $?
+  local EFIDUMP=$(efibootmgr | xargs)
+
+  # Boot[0-9]{4}\* -- get 'BootNNNN*' (N = value from 0-9)
+  # EFIDUMP -- output of efibootmgr
+  for preint in $(grep -E -o "Boot[0-9]{4}\*" <<<"$EFIDUMP"); do
+    # grep -F -- get plain text only, no regex or grep experessions
+    if (grep -q -F -o "$preint $label HD(" <<<"$EFIDUMP"); then
+      # //[!0-9] -- remove all non-numbers
+      int="${preint//[!0-9]}"
+      unset preint EFIDUMP
+      break
+    fi
+  done
 }
 
-function sub
+entry_exists()
 {
-  if ((${#NUMARGV[@]})); then
+  match_entry
+  # int should be 4 integers long (e.g. 0001)
+  ((${#int} == 4))
+}
+
+sub()
+{
+  if ((${#NUMARGV[@]} > 0)); then
     for i in ${NUMARGV[@]}; do
       _$1
     done
   else
     # declare -i -- set integer variable
     declare -i i=1
-    while (execq entry_$i); do
+    while (command -v entry_$i >/dev/null); do
       _$1
       i+=1
     done
   fi
 }
 
-function usage
+version()
+{
+  local bold=$'\e[1m'
+  local none=$'\e[0m'
+
+  VERSION='0.1.4-4'
+  VERSION_CODE=16
+  TIME='23:59'
+  DATE='29/03/2024'
+  TZONE='GMT'
+  MAINTAINER='9Omori'
+  
+  EVERSION=$(efibootmgr -V) EVERSION="${EVERSION//[!0-9]}"
+
+  BVERSION=$(
+    declare -i i=0
+    until (($i == 3)); do
+      echo -n ".${BASH_VERSINFO[$i]}"; i+=1
+    done
+  )
+  BVERSION="${BVERSION#.}"
+
+  echo $bold"$VERSION"$none
+  echo " Build:   $TIME $DATE [$TZONE]"
+  echo " Install: efibootmgr $EVERSION, bash $BVERSION"
+}
+
+usage()
 {
   # ${0/*\/} -- remove everything before '/' to
   # get just executable name
   echo \
-"stubload version $VERSION
+"\
 Usage: ${0/*\/} [OPTION]...
 
  -h, --help          print help & exit
  -v, --verbose       don't suppress output
  -V, --version       print version
+ -i, --prompt        prompt before performing potentially dangerous actions
  -C, --edit_config   edit configuration file
  -G, --cmdline       get current cmdline
  -A, --add_cmdline   add option to kernel cmdline
@@ -70,73 +104,74 @@ Usage: ${0/*\/} [OPTION]...
  -l, --list          list entries
  -c, --create        create entries
  -r, --remove        remove entries
- -[n]                specify entry's number to target
+ -n[#]               specify entry's number to target
 
  --force             ignore errors
  --config [file]     specify configuration file
-"
+" &&
+    exit 0
 }
 
-function scripts
+summary()
 {
-  # add a '.' to the front of a script's name to disable it
-  for script in $(ls -1 -d /lib/stubload/scripts/*.sh 2>/dev/null); do
-    source "$script" >>$log
-  done
-}
+  NUMARGVN="${NUMARGV[@]}" NUMARGVN=(${NUMARGVN// /, })
 
-function preset
-{
-  source /lib/stubload/presets/"$1" >>$log
-}
-
-function config
-{
-  if (($configArg)) && ((${#STRARGV[@]})); then
-    config="${STRARGV[0]}"
-    STRARGV="${STRARGV[@]/$config}"
-  elif (($configArg)); then
-    die "configuration file expected"
+  if ((${#NUMARGVN[*]} < 1)); then
+    NUMARGVN=("all")
   fi
 
-  configDir=$(dirname $config)
-  configBase=$(basename $config)
+  if [ "${QUEUE[2]}" == "remove_entry" ]; then
+    SUM[2]="Remove: ${NUMARGVN[*]}"
+  fi
 
-  [ -d "$configDir" ] || mkdir -v $configDir
+  if [ "${QUEUE[3]}" == "create_entry" ]; then
+    SUM[3]="Create: ${NUMARGVN[*]}"
+  fi
 
-  target()
-  {
-    if [[ "$1" == "-p" || "$1" == "--preset" ]]; then
-      preset "$2"
-    else
-      target="$1"
-    fi
-  }
+  if ((${#SUM[@]} > 0)); then
+    echo "The following actions will be performed:"
 
-  ramdisk()
-  {
-    if [[ "$1" == "-p" || "$1" == "--preset" ]]; then
-      preset "$2"
-    else
-      ramdisk="$1"
-    fi
-  }
+    # '%s\n' -- print each entry in variable and newline
+    printf -- '- %s\n' "${SUM[@]}"
 
-  dir() { bootDir="$1" ;}
-  label() { label="$1" ;}
-  cmdline() { unicode="$1" ;}
+    _ask()
+    {
+      read -p "Is this okay? [y/n] " yn
 
-  CONFIN=$(<$config)
-
-  source "$config" || die "$config: failed to access configuration file"
+      case "${yn,,}" in
+        "yes"|"y") ret=0 ;;
+        "no"|"n") ret=1 ;;
+        *) _ask ;;
+      esac
+      return $ret
+    }
+    _ask
+  fi
 }
 
-function edit_config
+config()
 {
-  config
+  if [ "$config_arg" == true ]; then
+    config="${STRARGV[0]}"
+    STRARGV="${STRARGV[@]/$config}"
+  fi
 
-  ((${#EDITOR})) || EDITOR=vi
-  TMP="$configDir/$configBase-$(date +%s).tmp"
+  if ((${#config} < 1)); then
+    config="/etc/efistub/stubload.conf"
+  fi
+
+  config_dir=$(dirname "$config")
+  config_base=$(basename "$config")
+
+  source /lib/stubload/config.sh
+}
+
+edit_config()
+{
+  if ((${#EDITOR} < 1)); then
+    EDITOR=vi
+  fi
+  TMP="$config_dir/$config_base-$(date +%s).tmp"
 
   cp "$config" "$TMP"
   $EDITOR "$TMP"
@@ -150,102 +185,107 @@ function edit_config
   fi
 }
 
-function cmdline
+get_cmdline()
 {
-  config
-
-  function _cmdline
+  _get_cmdline()
   {
-    if ! ((${#i})); then
-      die "must specify an entry"
-    fi
     entry_$i
 
-    echo "$i| $unicode"
+    echo "$i|$unicode"
   }
 
-  sub "${FUNCNAME[0]}"
+  sub $FUNCNAME
 }
 
-function add_cmdline
+add_cmdline()
 {
-  config
-
-  function _add_cmdline
+  _add_cmdline()
   {
-    if ! ((${#i})); then
-      die "no entry to modify specified"
-    fi
     entry_$i
 
-    origUnicode="$unicode"
+    confin
+
+    orig_unicode="$unicode"
     unicode="$unicode ${STRARGV[@]}"
 
-    echo "${CONFIN/$origUnicode/$unicode}" >$config
+    echo "${CONFIN/$orig_unicode/$unicode}" >$config
     echo "${STRARGV[@]}: added to cmdline"
   }
 
-  sub "${FUNCNAME[0]}"
+  sub $FUNCNAME
+  cmdline
 }
 
-function rm_cmdline
+rm_cmdline()
 {
-  config
-
-  function _rm_cmdline
+  _rm_cmdline()
   {
-    if ! ((${#i})); then
-      die "no entry to modify specified"
-    fi
     entry_$i
 
-    origUnicode="$unicode"
+    confin
+
+    orig_unicode="$unicode"
     unicode="${unicode/${STRARGV[@]}}" unicode=$(xargs <<<"$unicode")
 
-    echo "${CONFIN/$origUnicode/$unicode}" >$config
+    echo "${CONFIN/$orig_unicode/$unicode}" >$config
     echo "${STRARGV[@]}: removed from cmdline"
   }
 
-  sub "${FUNCNAME[0]}"
+  sub $FUNCNAME
+  cmdline
 }
 
-function match_entry
+list_entry()
 {
-  EFIDUMP=$(efibootmgr | xargs)
-  BOOTINTS=$(grep -E -o "Boot[0-9]{4}\*" <<<"$EFIDUMP")
+  _list_entry()
+  {
+    entry_$i; match_entry
 
-  for bootint in ${BOOTINTS[@]}; do
-    if (grep -q -F -o "$bootint $label HD(" <<<"$EFIDUMP"); then
-      int="${bootint//[!0-9]}"
-      break
+    if (entry_exists); then
+      echo "$int|$i $label"
     fi
-  done
+  }
+
+  sub $FUNCNAME
 }
 
-function entry_exists
+remove_entry()
 {
-  unset int EFIDUMP BOOTNUMS
-  match_entry
-  ((${#int} == 4))
-}
-
-function create_entry
-{
-  config; scripts
-  cd $configDir
-
-  function _create_entry
+  _remove_entry()
   {
     entry_$i
 
-    if (entry_exists) && ! (($force)); then
-      die \
+    echo "remove: $label "
+    until (! entry_exists); do
+      match_entry
+      if ((${#int} == 4)); then
+        efibootmgr -B -b "$int" &>>$log || unset int
+      fi
+    done
+  }
+
+  sub $FUNCNAME
+}
+
+create_entry()
+{
+  # add a '.' to the front of a script's name to disable it
+  for script in $(ls -1 -d /lib/stubload/scripts/*.sh 2>/dev/null); do
+    source "$script" &>>$log
+  done
+
+  _create_entry()
+  {
+    entry_$i
+
+    if (entry_exists && ! [ "$force" == true ]); then
+      fatal \
         "$label: entry already exists"\
-        "use '--force' to ignore"
+        $'\n'"use '--force' to ignore or '--remove' to replace it"
     fi
 
     # "${part/ */}" -- get only first string
-    part=$(grep " $bootDir " </proc/mounts); part="${part// *}"
+    part=$(grep " $boot_dir " </proc/mounts); part="${part// *}"
     local part="$part"
 
     case "${part#/dev/}" in
@@ -253,96 +293,38 @@ function create_entry
         # '//p*' -- remove 'p' & everything after 'p'
         # '//*p' -- remove 'p' & everything before 'p'
         local disk="${part//p*}"
-        local partInt="${part//*p}"
+        local part_int="${part//*p}"
         ;;
       "sd"*)
         # '//[!0-9]' -- remove all non-numbers
         local disk="${part//sd*}"
-        local partInt="${part//[!0-9]}"
+        local part_int="${part//[!0-9]}"
         ;;
       *)
-        die "$part: unrecognised disk mapping"
+        fatal "$part: unrecognised disk mapping"
         ;;
     esac
 
     echo "create: $label "
-    efibootmgr -c -d "$disk" -p "$partInt" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" >>$log
+    efibootmgr -c -d "$disk" -p "$part_int" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" &>>$log
   }
 
-  sub "${FUNCNAME[0]}"
+  sub $FUNCNAME
 }
 
-function remove_entry
+main()
 {
-  config
-
-  function _remove_entry
-  {
-    entry_$i
-
-    echo "remove: $label "
-    while (entry_exists); do
-      match_entry
-
-      if ((${#int} == 4)); then
-        efibootmgr -B -b "$int" >>$log
-      fi
-    done
-
-    if (entry_exists); then
-      die "$label: failed to remove entry"
-    fi
-  }
-
-  sub "${FUNCNAME[0]}"
-}
-
-function list_entry
-{
-  config
-
-  function _list_entry
-  {
-    entry_$i
-
-    int=$(efibootmgr | grep "$label" | head -n1 -c8) int="${int/Boot}"
-    (entry_exists) && echo "$int|$i $label"
-  }
-
-  sub "${FUNCNAME[0]}"
-}
-
-function version
-{
-  echo "stubload version $VERSION"
-  echo "efibootmgr version $EVERSION"
-}
-
-function parse_arg
-{
-  function _arg
-  {
-    declare -i i
-    case "$1" in
-      "version"|"usage"|"list_entry"|"remove_entry"|"edit_config"|"cmdline") i=1 ;;
-      "create_entry") i=2 ;;
-      "add_cmdline"|"rm_cmdline"|"config") i=0 ;;
-    esac
-
-    ((${#ARGX[$i]})) && die "conflicting arguments provided"
-    ARGX[$i]="$1"
-  }
-
   for ARG in $@; do
     case "$ARG" in
       "--"*)
         :
         ;;
-      "-"[0-9]*)
+      "-n"*)
+        NUMARGV+=( "${ARG//[!0-9]}" )
         set -- ${@/$ARG}
-        NUMARGV+=( ${ARG/-} )
         ;;
       "-"*)
+        # fold -w1 <<<"${ARG/-}" -- add spaces between each argument
         for SHORTARG in $(fold -w1 <<<"${ARG/-}" | xargs); do
           set -- "-$SHORTARG" ${@/-$SHORTARG}
         done
@@ -350,39 +332,67 @@ function parse_arg
     esac
   done
 
-  while (($#)); do
+  _queue()
+  {
     case "$1" in
-      "--force") force=1 ;;
-      "--config") configArg=1; _arg "config" ;;
-      "--verbose"|"-v") verbose=1 ;;
-      "--version"|"-V") _arg "version" ;;
-      "--help"|"-h"|"-?") _arg "usage" ;;
-      "--edit_config"|"-C") _arg "edit_config" ;;
-      "--cmdline"|"-G") _arg "cmdline" ;;
-      "--add_cmdline"|"-A") _arg "add_cmdline" ;;
-      "--rm_cmdline"|"-R") _arg "rm_cmdline" ;;
-      "--list"|"-l") _arg "list_entry" ;;
-      "--remove"|"-r") _arg "remove_entry" ;;
-      "--create"|"-c") _arg "create_entry" ;;
-      "--"*|"-"*) die "unrecognised option -- ${1//-}" ;;
+      "version"|"usage"|"list_entry"|"remove_entry"|"edit_config"|"cmdline")
+        i=2
+        ;;
+      "create_entry")
+        i=3
+        ;;
+      "add_cmdline"|"rm_cmdline")
+        i=1
+        ;;
+      "summary")
+        i=0
+        ;;
+    esac
+
+    if ((${#ARGX[$i]} > 0)); then
+      fatal "conflicting arguments provided"
+    fi
+
+    QUEUE[$i]="$1"
+  }
+
+  log=/dev/null
+
+  while (($# > 0)); do
+    case "$1" in
+      "--force") force=true ;;
+      "--config") config_arg=true ;;
+      "--verbose"|"-v") verbose=true log=/dev/stderr ;;
+      "--prompt"|"-i") _queue "summary" ;;
+      "--version"|"-V") _queue "version" ;;
+      "--help"|"-h"|"-?") _queue "usage" ;;
+      "--edit_config"|"-C") _queue "edit_config" ;;
+      "--cmdline"|"-G") _queue "get_cmdline" ;;
+      "--add_cmdline"|"-A") _queue "add_cmdline" ;;
+      "--rm_cmdline"|"-R") _queue "rm_cmdline" ;;
+      "--list"|"-l") _queue "list_entry" ;;
+      "--remove"|"-r") _queue "remove_entry" ;;
+      "--create"|"-c") _queue "create_entry" ;;
+      "--"*|"-"*) fatal "unrecognised option -- ${1//-}" ;;
       *) STRARGV+=( "$1" ) ;;
     esac
     shift
   done
 
-  ((${#ARGX[@]})) || _arg "usage"
+  if ((${#QUEUE[@]} < 1)); then
+    _queue "usage"
+  fi
 
-  unset _arg
+  for ARG in "edit_config" "get_cmdline" "add_cmdline" "rm_cmdline" "list_entry" "remove_entry" "create_entry"; do
+    for QN in ${QUEUE[@]}; do
+      if [ "$QN" == "$ARG" ]; then
+        config
+      fi
+    done
+  done
+
+  for each in ${QUEUE[@]}; do
+    "$each"
+  done
 }
-
-((${#config})) || config="/etc/efistub/stubload.conf"
-void=/dev/null
-
-parse_arg $@
-
-log="/dev/null"
-(($verbose)) && log="/dev/stdout"
-
-for func in ${ARGX[@]}; do
-  "$func"
-done
+main $@

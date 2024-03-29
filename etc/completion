@@ -7,7 +7,9 @@ _stubload_completion()
     "--help"
     "--verbose"
     "--version"
+    "--prompt"
     "--edit_config"
+    "--cmdline"
     "--add_cmdline"
     "--rm_cmdline"
     "--list"
@@ -20,12 +22,15 @@ _stubload_completion()
     "-h"
     "-v"
     "-V"
+    "-i"
     "-C"
+    "-G"
     "-A"
     "-R"
     "-l"
     "-c"
     "-r"
+    "-n"
   )
 
   case "$prev" in
@@ -48,6 +53,9 @@ _stubload_completion()
         ;;
       "-")
         RES="${SHORTARGV[@]}"
+        ;;
+      "-n")
+        RES="$cur$(echo {0..9})"
         ;;
       "-"*)
         RES="$cur"
