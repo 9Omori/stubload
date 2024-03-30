@@ -13,7 +13,7 @@ fatal()
   # >&2 -- redirect stdout to stderr
   echo $red"error:"$none "$@"
 
-  if ! [ "$force" == true ]; then
+  if [ "$force" != true ]; then
     return 1
   fi
 }
@@ -50,7 +50,7 @@ sub()
   else
     # declare -i -- set integer variable
     declare -i i=1
-    while (command -v entry_$i >/dev/null); do
+    while (command -v entry_$i 1>/dev/null); do
       _$1
       i+=1
     done
@@ -383,7 +383,7 @@ main()
   for each in ${QUEUE[@]}; do
     case "$each" in
       "edit_config"|"get_cmdline"|"add_cmdline"|"rm_cmdline"|"list_entry"|"remove_entry"|"create_entry")
-        if ! [ "$config_srcd" = true ]; then
+        if [ "$config_srcd" != true ]; then
           source /lib/stubload/config.sh
         fi
         config_srcd=true

@@ -50,7 +50,7 @@ Installation
 Stubload comes packaged in RPM (RedHat), DEB (Debian) & TZST (all)
 
 If you want to request an additional packaging format, please create an
-`issue <https://github.com/9Omori/stubload/issues>`__ with the label
+`issue <https://github.com/alemontn/stubload/issues>`__ with the label
 ‘enhancement’
 
 I do plan to add an Arch package sometime in the near future, if anyone
@@ -59,7 +59,7 @@ an issue
 
 After installation, you will need a configuration file in
 ``/etc/efistub/stubload.conf``. You can find an example of
-this configuration file `here <https://github.com/9Omori/stubload/blob/main/etc/stubload.conf>`__.
+this configuration file `here <https://github.com/alemontn/stubload/blob/main/etc/stubload.conf>`__.
 
 Building
 --------

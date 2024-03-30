@@ -23,7 +23,7 @@ fatal()
   return 1
 }
 
-GIT_REPO='https://github.com/9Omori/stubload.git'
+GIT_REPO='https://github.com/alemontn/stubload.git'
 PKGS=(rpm git tar zstd gzip)
 
 BUILD="$PWD/build"
@@ -98,7 +98,7 @@ Version: $FULL_VERSION
 Section: utils
 Priority: optional
 Architecture: all
-Maintainer: basil <118671833+9Omori@users.noreply.github.com>
+Maintainer: alemontn <118671833+alemontn@users.noreply.github.com>
 Description: $DESCRIPTION
 Depends: ${DEB_DEPENDNECIES[*]}
 Recommends: sudo\
