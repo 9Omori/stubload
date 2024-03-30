@@ -221,6 +221,7 @@ build_package()
     mv *.tzst $OUT
   }
 
+  meta
   for pkg in $OUT/*.{rpm,deb,tzst}; do
     pkgformat="${pkg/*.}"
     new="stubload-$FULL_VERSION.allarch.$pkgformat"
