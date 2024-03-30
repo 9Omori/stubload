@@ -1,5 +1,5 @@
 # -E -o "\-[0-9].*-rescue.*[^.img]" -- look for regex pattern '-N-rescue-RANDOM[not .img]'
-VERSION=$(ls $bootDir | grep -E -o "\-[0-9].*-rescue.*[^.img]" | head -n1) VERSION="${VERSION#-}"
+VERSION=$(ls $boot_dir | grep -E -o "\-[0-9].*-rescue.*[^.img]" | head -n1) VERSION="${VERSION#-}"
 
 target "vmlinuz-$VERSION"
 ramdisk "initramfs-$VERSION.img"

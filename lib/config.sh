@@ -1,4 +1,11 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
+
+if [ ! -f "$config" ]; then
+  config=/etc/efistub/stubload.conf
+fi
+
+config_dir=$(dirname "$config")
+config_base=$(basename "$config")
 
 confin()
 {

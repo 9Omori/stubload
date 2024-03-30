@@ -1,9 +1,9 @@
-if [ -f "$bootDir/vmlinuz" ] && [ -f "$bootDir/initrd.img" ]; then
+if [ -f "$boot_dir/vmlinuz" ] && [ -f "$boot_dir/initrd.img" ]; then
   target "vmlinuz"
   ramdisk "initrd.img"
 else
   # -E -o "\-[0-9].*-[a-z].*" -- look for '-VERSION-ARCH'
-  VERSION=$(ls $bootDir | grep -E -o "\-[0-9].*-[a-z].*" | head -n1) VERSION="${VERSION#-}"
+  VERSION=$(ls $boot_dir | grep -E -o "\-[0-9].*-[a-z].*" | head -n1) VERSION="${VERSION#-}"
   target "vmlinuz-$VERSION"
   ramdisk "initrd.img-$VERSION"
 fi

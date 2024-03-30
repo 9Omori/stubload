@@ -119,19 +119,19 @@ summary()
     NUMARGVN=("all")
   fi
 
-  if [ "${QUEUE[2]}" == "remove_entry" ]; then
-    SUM[2]="Remove: ${NUMARGVN[*]}"
+  if [ "${QUEUE[3]}" == "remove_entry" ]; then
+    ASK[3]="Remove: ${NUMARGVN[*]}"
   fi
 
-  if [ "${QUEUE[3]}" == "create_entry" ]; then
-    SUM[3]="Create: ${NUMARGVN[*]}"
+  if [ "${QUEUE[4]}" == "create_entry" ]; then
+    ASK[4]="Create: ${NUMARGVN[*]}"
   fi
 
-  if ((${#SUM[@]} > 0)); then
+  if ((${#ASK[@]} > 0)); then
     echo "The following actions will be performed:"
 
     # '%s\n' -- print each entry in variable and newline
-    printf -- '- %s\n' "${SUM[@]}"
+    printf -- '- %s\n' "${ASK[@]}"
 
     _ask()
     {
@@ -148,21 +148,10 @@ summary()
   fi
 }
 
-config()
+config_arg()
 {
-  if [ "$config_arg" == true ]; then
-    config="${STRARGV[0]}"
-    STRARGV="${STRARGV[@]/$config}"
-  fi
-
-  if ((${#config} < 1)); then
-    config="/etc/efistub/stubload.conf"
-  fi
-
-  config_dir=$(dirname "$config")
-  config_base=$(basename "$config")
-
-  source /lib/stubload/config.sh
+  config="${STRARGV[0]}"
+  STRARGV="${STRARGV[*]#$config}"
 }
 
 edit_config()
@@ -236,12 +225,18 @@ rm_cmdline()
 
 list_entry()
 {
+  local bold=$'\e[1m'
+  local none=$'\e[0m'
+
   _list_entry()
   {
     entry_$i; match_entry
 
     if (entry_exists); then
       echo "$int|$i $label"
+      if [ "$verbose" == true ]; then
+        echo ' '$bold"$target"$none "$unicode"
+      fi
     fi
   }
 
@@ -325,7 +320,7 @@ main()
       "-"*)
         # fold -w1 <<<"${ARG/-}" -- add spaces between each argument
         for SHORTARG in $(fold -w1 <<<"${ARG/-}" | xargs); do
-          set -- "-$SHORTARG" ${@/-$SHORTARG}
+          set -- "-$SHORTARG" ${@#-$SHORTARG}
         done
         ;;
     esac
@@ -335,20 +330,23 @@ main()
   {
     case "$1" in
       "version"|"usage"|"list_entry"|"remove_entry"|"edit_config"|"cmdline")
-        i=2
-        ;;
-      "create_entry")
         i=3
         ;;
+      "create_entry")
+        i=4
+        ;;
       "add_cmdline"|"rm_cmdline")
-        i=1
+        i=2
         ;;
       "summary")
+        i=1
+        ;;
+      "config_arg")
         i=0
         ;;
     esac
 
-    if ((${#ARGX[$i]} > 0)); then
+    if ((${#QUEUE[$i]} > 0)); then
       fatal "conflicting arguments provided"
     fi
 
@@ -359,9 +357,9 @@ main()
 
   while (($# > 0)); do
     case "$1" in
-      "--force") force=true ;;
-      "--config") config_arg=true ;;
+      "--force") force=true ;;      
       "--verbose"|"-v") verbose=true log=/dev/stderr ;;
+      "--config") _queue "config_arg" ;;
       "--prompt"|"-i") _queue "summary" ;;
       "--version"|"-V") _queue "version" ;;
       "--help"|"-h"|"-?") _queue "usage" ;;
@@ -372,7 +370,7 @@ main()
       "--list"|"-l") _queue "list_entry" ;;
       "--remove"|"-r") _queue "remove_entry" ;;
       "--create"|"-c") _queue "create_entry" ;;
-      "--"*|"-"*) fatal "unrecognised option -- ${1//-}" ;;
+      "--"*|"-"*) fatal "unrecognised option -- ${1##-}" ;;
       *) STRARGV+=( "$1" ) ;;
     esac
     shift
@@ -386,7 +384,7 @@ main()
     case "$each" in
       "edit_config"|"get_cmdline"|"add_cmdline"|"rm_cmdline"|"list_entry"|"remove_entry"|"create_entry")
         if ! [ "$config_srcd" = true ]; then
-          config
+          source /lib/stubload/config.sh
         fi
         config_srcd=true
         ;;
