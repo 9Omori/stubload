@@ -10,7 +10,7 @@ target()
 {
   case "$1" in
     "-p"|"--preset")
-      source /lib/stubload/presets/"$1" &>>$log
+      source /lib/stubload/presets/"$2" &>>$log
       ;;
     *)
       target="$1"
@@ -37,3 +37,5 @@ cmdline()
 {
   unicode="$1"
 }
+
+source "$config"

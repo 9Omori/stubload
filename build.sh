@@ -11,8 +11,7 @@ meta()
   VERSION='0.1.4'
   FULL_VERSION='0.1.4-4'
   DESCRIPTION="a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel"
-  FEDORA_DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep' 'ncurses')
-  DEBIAN_DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep' 'ncurses-bin')
+  DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep')
 }
 
 fatal()
@@ -51,11 +50,10 @@ Version: $VERSION
 Release: 1%{?dist}
 Summary: $DESCRIPTION
 BuildArch: noarch
-
 License: GPL
 Source0: %{name}-%{version}.tgz
 
-Requires: ${FEDORA_DEPENDENCIES[*]}
+Requires: ${DEPENDENCIES[*]}
 
 %description
 %{summary}
@@ -91,6 +89,8 @@ rm -rf \$RPM_BUILD_ROOT
 deb_control()
 {
   meta
+  DEB_DEPENDENCIES=$(printf ' ,%s' "${DEPENDENCIES[*]}")
+  DEB_DEPENDENCIES=(${DEB_DEPENDENCIES# ,})
   echo >&1 \
 "\
 Package: stubload
@@ -100,7 +100,7 @@ Priority: optional
 Architecture: all
 Maintainer: basil <118671833+9Omori@users.noreply.github.com>
 Description: $DESCRIPTION
-Depends: ${DEBIAN_DEPENDENCIES// /,}
+Depends: ${DEB_DEPENDNECIES[*]}
 Recommends: sudo\
 "
 }

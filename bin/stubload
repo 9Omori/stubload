@@ -24,12 +24,11 @@ match_entry()
 
   # Boot[0-9]{4}\* -- get 'BootNNNN*' (N = value from 0-9)
   # EFIDUMP -- output of efibootmgr
-  for preint in $(grep -E -o "Boot[0-9]{4}\*" <<<"$EFIDUMP"); do
+  for preint in $(grep -E -o 'Boot[0-9]{4}\*' <<<"$EFIDUMP"); do
     # grep -F -- get plain text only, no regex or grep experessions
-    if (grep -q -F -o "$preint $label HD(" <<<"$EFIDUMP"); then
+    if (grep -q -F "$preint $label HD(" <<<"$EFIDUMP"); then
       # //[!0-9] -- remove all non-numbers
       int="${preint//[!0-9]}"
-      unset preint EFIDUMP
       break
     fi
   done
@@ -189,7 +188,7 @@ get_cmdline()
 {
   _get_cmdline()
   {
-    entry_$i
+    entry_$i; match_entry
 
     echo "$i|$unicode"
   }
@@ -383,15 +382,15 @@ main()
     _queue "usage"
   fi
 
-  for ARG in "edit_config" "get_cmdline" "add_cmdline" "rm_cmdline" "list_entry" "remove_entry" "create_entry"; do
-    for QN in ${QUEUE[@]}; do
-      if [ "$QN" == "$ARG" ]; then
-        config
-      fi
-    done
-  done
-
   for each in ${QUEUE[@]}; do
+    case "$each" in
+      "edit_config"|"get_cmdline"|"add_cmdline"|"rm_cmdline"|"list_entry"|"remove_entry"|"create_entry")
+        if ! [ "$config_srcd" = true ]; then
+          config
+        fi
+        config_srcd=true
+        ;;
+    esac
     "$each"
   done
 }

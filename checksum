@@ -44,5 +44,6 @@ d9c8f7936ea9e490b5e803fea16b8cced5f0b9f8  etc/completion
 # 23:58[GMT] | 29/03/2024
 959c29e10c2c1b2bd2665b926b84ba91b235fc72  build.sh
 aae3413cc0ff7a9b91bc2d5370084d892d35390d  bin/stubload
+b8f72b0a7eb5bba8e5a8971d5f703c7df1924277  lib/config.sh
 4144efa0106ec30489118cb61fd7a7ca0c3ba1b7  etc/stubload.conf
 348cfbfdeda4f5e69be7e6faf446e80f0354a72c  etc/completion
