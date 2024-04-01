@@ -85,8 +85,9 @@ rm -rf \$RPM_BUILD_ROOT
 /lib/stubload/presets/debian
 /lib/stubload/presets/fedora
 /lib/stubload/presets/fedora-rescue
-/lib/stubload/scripts
-/lib/stubload/config.sh\
+/lib/stubload/scripts/
+/lib/stubload/config.sh
+/etc/efistub/\
 "
 }
 
