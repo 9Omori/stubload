@@ -6,6 +6,7 @@ v0.1.4:
 + Fix entry identification
 + Add prompt option
 + Move all configuration stuff to lib/config.sh
++ Add manpage (stubload(1))
 
 v0.1.3:
 + Improve argument parsing method (again) & general code
