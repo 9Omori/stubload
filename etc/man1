@@ -1,0 +1,99 @@
+.TH STUBLOAD "1" "1 April 2024" "" ""
+
+.SH "NAME"
+stubload \- manual page for stubload
+
+.SH "SYNOPSIS"
+.B stubload
+.RB [ "\-hvViCARlcr" ]
+.RB [ "\-n[#]" ]
+.RB [ "\-\-force" ]
+.RB [ "\-\-verbose" ]
+
+.SH "DESCRIPTION"
+.B stubload
+is a shell script that simplifies
+the process of creating, removing and modifying
+Linux EFIstub entries using efibootmgr
+
+.SH "OPTIONS"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+print help & exit
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+don't suppress efibootmgr's and other utilities output
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print version of stubload, efibootmgr and bash
+.TP
+\fB\-i\fR, \fB\-\-prompt\fR
+prompt before performing potentially dangerous actions
+.TP
+\fB\-C\fR, \fB\-\-edit_config\fR
+edit configuration file located at
+/etc/efistub/stubload.conf
+.TP
+\fB\-A\fR, \fB\-\-add_cmdline\fR
+add option to kernel cmdline (global by default,
+use '-n' to select entry)
+.TP
+\fB\-R\fR, \fB\-\-rm_cmdline\fR
+remove option from kernel cmdline
+.TP
+\fB\-l\fR, \fB\-\-list\fR
+list entries created by stubload
+.TP
+\fB\-c\fR, \fB\-\-create\fR
+create entries with efibootmgr
+.TP
+\fB\-r\fR, \fB\-\-remove\fR
+remove entries
+.TP
+\fB\-\-force\fR
+stop errors from exiting
+.TP
+\fB\-\-config\fR [file]
+specify configuration file
+.TP
+\fB\-n\fR[#]
+specify entrys number to target
+
+.SH "EXAMPLES"
+\fR
+.SS "Create entry 1 and 2:"
+\fR
+.nf
+.B
+# stubload -n1 -n2 -c
+create: Entry 1
+create: Entry 2
+.fi
+\fR
+.SS "List entries created by stubload with cmdlines:"
+\fR
+.nf
+.B
+# stubload -lv
+0000|1 Entry 1
+ vmlinuz root=/dev/root ro quiet nosplash
+0001|2 Entry 2
+ vmlinuz root=/dev/root ro quiet nosplash
+.fi
+\fR
+.SS "Add fbcon=nodefer to cmdline for entry 1 and 2:"
+\fR
+.nf
+.B
+# stubload -n1 -n2 -A "fbcon=nodefer"
+fbcon=nodefer: Added to cmdline
+fbcon=nodefer: Added to cmdline
+.fi
+
+.SH "SEE ALSO"
+The Git repository for
+stubload
+is maintained at
+.BR <https://github.com/alemontn/stubload>
+.TP
+You can report issues or ask questions there

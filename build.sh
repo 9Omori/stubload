@@ -65,11 +65,13 @@ Requires: ${DEPENDENCIES[*]}
 mkdir -p \$RPM_BUILD_ROOT/usr/bin
 mkdir -p \$RPM_BUILD_ROOT/etc/efistub
 mkdir -p \$RPM_BUILD_ROOT/usr/share/bash-completion/completions
+mkdir -p \$RPM_BUILD_ROOT/usr/share/man/man1
 mkdir -p \$RPM_BUILD_ROOT/lib/stubload/scripts
 cp %{name} \$RPM_BUILD_ROOT/usr/bin/%{name}
 cp completion \$RPM_BUILD_ROOT/usr/share/bash-completion/completions/%{name}
 cp -a presets \$RPM_BUILD_ROOT/lib/stubload/presets
 cp config.sh \$RPM_BUILD_ROOT/lib/stubload/config.sh
+gzip -kc man1 >\$RPM_BUILD_ROOT/usr/share/man/man1/stubload.1.gz
 
 %clean
 rm -rf \$RPM_BUILD_ROOT
@@ -77,11 +79,13 @@ rm -rf \$RPM_BUILD_ROOT
 %files
 /usr/bin/%{name}
 /usr/share/bash-completion/completions/%{name}
+/usr/share/man/man1/stubload.1.gz
 /lib/stubload/presets/arch
 /lib/stubload/presets/arch-fallback
 /lib/stubload/presets/debian
 /lib/stubload/presets/fedora
 /lib/stubload/presets/fedora-rescue
+/lib/stubload/scripts
 /lib/stubload/config.sh\
 "
 }
@@ -101,7 +105,7 @@ Architecture: all
 Maintainer: alemontn <118671833+alemontn@users.noreply.github.com>
 Description: $DESCRIPTION
 Depends: ${DEB_DEPENDNECIES[*]}
-Recommends: sudo\
+Recommends: man\
 "
 }
 
@@ -143,6 +147,7 @@ environment()
       usr/bin \
       etc/efistub \
       usr/share/bash-completions/completions \
+      usr/share/man/man1 \
       lib/stubload/scripts
 
     deb_control >./DEBIAN/control
@@ -150,6 +155,7 @@ environment()
     cp $BUILD/source/etc/completion ./usr/share/bash-completions/completions/stubload
     cp -a $BUILD/source/lib/presets ./lib/stubload/presets
     cp $BUILD/source/lib/config.sh ./lib/stubload/config.sh
+    gzip -kc $BUILD/source/etc/man1 >./usr/share/man/man1/stubload.1.gz
 
     chmod +x usr/bin/stubload
     chown -R root:root etc/efistub
@@ -167,6 +173,7 @@ environment()
     cp $BUILD/source/bin/stubload $BUILD/source/etc/completion stubload/
     cp -a $BUILD/source/lib/presets stubload/presets
     cp $BUILD/source/lib/config.sh stubload/config.sh
+    cp $BUILD/source/etc/man1 stubload/man1
 
     chmod +x ./stubload/stubload
     chown -R root:root stubload
@@ -183,12 +190,14 @@ environment()
       usr/bin \
       etc/efistub \
       usr/share/bash-completion/completions \
+      usr/share/man/man1 \
       lib/stubload/scripts
 
     cp ../source/bin/stubload ./usr/bin/stubload
     cp ../source/etc/completion ./usr/share/bash-completion/completions/stubload
     cp -a ../source/lib/presets ./lib/stubload/presets
     cp ../source/lib/config.sh ./lib/stubload/config.sh
+    gzip -kc ../source/etc/man1 >./usr/share/man/man1/stubload.1.gz
 
     chmod +x ./usr/bin/stubload
     chown -R root:root etc/efistub
