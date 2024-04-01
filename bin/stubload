@@ -29,6 +29,7 @@ match_entry()
     if (grep -q -F "$preint $label HD(" <<<"$EFIDUMP"); then
       # //[!0-9] -- remove all non-numbers
       int="${preint//[!0-9]}"
+      unset EFIDUMP
       break
     fi
   done
@@ -277,8 +278,14 @@ create_entry()
     fi
 
     # "${part/ */}" -- get only first string
-    part=$(grep " $boot_dir " </proc/mounts); part="${part// *}"
+    part=$(df "$boot_dir" | grep -E '/dev/'); part="${part// *}"
     local part="$part"
+
+    # get path of target relative to mount point
+    if (! grep -q " $boot_dir " </proc/mounts); then
+      base_mount=$(grep "$part " </proc/mounts | cut -d' ' -f2)
+      target="${boot_dir#$base_mount}/$target"
+    fi
 
     case "${part#/dev/}" in
       "nvme"*|"mmcblk"*)
