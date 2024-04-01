@@ -203,7 +203,7 @@ environment()
     chown -R root:root etc/efistub
     chmod 700 etc/efistub
 
-    rm -r -f $(ls -A | sed 's/usr//; s/etc//')
+    rm -r -f $(ls -A | sed 's/usr//; s/etc//; s/lib//')
   }
 }
 
