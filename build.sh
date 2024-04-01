@@ -50,7 +50,7 @@ Version: $VERSION
 Release: 1%{?dist}
 Summary: $DESCRIPTION
 BuildArch: noarch
-License: GPL
+License: MPL-2.0
 Source0: %{name}-%{version}.tgz
 
 Requires: ${DEPENDENCIES[*]}

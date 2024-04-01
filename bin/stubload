@@ -67,7 +67,7 @@ version()
   TIME='23:59'
   DATE='29/03/2024'
   TZONE='GMT'
-  MAINTAINER='9Omori'
+  MAINTAINER='alemontn'
   
   EVERSION=$(efibootmgr -V) EVERSION="${EVERSION//[!0-9]}"
 
@@ -90,7 +90,7 @@ usage()
   # get just executable name
   echo \
 "\
-Usage: ${0/*\/} [OPTION]...
+Usage: ${0##*/} [OPTION]...
 
  -h, --help          print help & exit
  -v, --verbose       don't suppress output
@@ -201,7 +201,6 @@ add_cmdline()
   }
 
   sub $FUNCNAME
-  cmdline
 }
 
 rm_cmdline()
@@ -220,7 +219,6 @@ rm_cmdline()
   }
 
   sub $FUNCNAME
-  cmdline
 }
 
 list_entry()
