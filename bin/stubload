@@ -37,22 +37,34 @@ match_entry()
 
 entry_exists()
 {
-  match_entry
+  if [ 1 -gt ${#int} ]; then
+    match_entry
+  fi
+
   # int should be 4 integers long (e.g. 0001)
   ((${#int} == 4))
 }
 
 sub()
 {
+  _run_main()
+  {
+    if (command -v _cache_$1); then
+      _cache_$main
+    fi
+    _$main
+  }
+
+  main="$1"
   if ((${#NUMARGV[@]} > 0)); then
     for i in ${NUMARGV[@]}; do
-      _$1
+      _run_main
     done
   else
     # declare -i -- set integer variable
     declare -i i=1
     while (command -v entry_$i 1>/dev/null); do
-      _$1
+      _run_main
       i+=1
     done
   fi
@@ -244,6 +256,17 @@ list_entry()
 
 remove_entry()
 {
+  _cache_remove_entry()
+  {
+    while read line; do
+      eval $line
+      if (entry_exists); then
+        echo "remove: $int"
+        efibootmgr -B -b "$int" &>>$log || unset int
+      fi
+    done </lib/stubload/cachefile
+  }
+
   _remove_entry()
   {
     entry_$i
@@ -252,7 +275,9 @@ remove_entry()
     until (! entry_exists); do
       match_entry
       if ((${#int} == 4)); then
-        efibootmgr -B -b "$int" &>>$log || unset int
+        efibootmgr -B -b "$int" &>>$log &&
+          sed "s/int=$int//" </lib/stubload/cachefile | xargs >/lib/stubload/cachefile ||
+          unset int
       fi
     done
   }
@@ -306,6 +331,10 @@ create_entry()
 
     echo "create: $label "
     efibootmgr -c -d "$disk" -p "$part_int" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" &>>$log
+
+    match_entry
+    echo "int=$int" >>/lib/stubload/cachefile
+    unset int
   }
 
   sub $FUNCNAME

@@ -1,13 +1,14 @@
 v0.1.4:
-+ Add configuration editor
-+ Add cmdline additions/removals
-+ Add presets
-+ Fix duplicate '--config' arguments
++ Add configuration editor (-C)
++ Add cmdline additions/removals (-A + -R)
++ Add presets (/lib/stubload/presets)
++ Fix duplicate '--config' arguments (--edit_config + --config)
 + Fix entry identification
 + Add prompt option
-+ Move all configuration stuff to lib/config.sh
++ Move all configuration stuff (-> lib/config.sh)
 + Add manpage (stubload(1))
-+ Fix not being able to find mountpoint of subdirectories
++ Fix not being able to find mountpoint of subdirectories (grep -> df)
++ Add cachefile for when entry's label changes (/lib/stubload/cachefile)
 
 v0.1.3:
 + Improve argument parsing method (again) & general code
