@@ -63,10 +63,10 @@ version()
   local bold=$'\e[1m'
   local none=$'\e[0m'
 
-  VERSION='0.1.4-4'
-  VERSION_CODE=16
-  TIME='23:59'
-  DATE='29/03/2024'
+  VERSION='0.1.4-5'
+  VERSION_CODE=17
+  TIME='22:56'
+  DATE='01/04/2024'
   TZONE='GMT'
   MAINTAINER='alemontn'
   

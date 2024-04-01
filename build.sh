@@ -9,7 +9,7 @@ set -o xtrace
 meta()
 {
   VERSION='0.1.4'
-  FULL_VERSION='0.1.4-4'
+  FULL_VERSION='0.1.4-5'
   DESCRIPTION="a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel"
   DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep')
 }

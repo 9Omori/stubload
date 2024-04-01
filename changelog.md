@@ -7,6 +7,7 @@ v0.1.4:
 + Add prompt option
 + Move all configuration stuff to lib/config.sh
 + Add manpage (stubload(1))
++ Fix not being able to find mountpoint of subdirectories
 
 v0.1.3:
 + Improve argument parsing method (again) & general code
