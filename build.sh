@@ -146,13 +146,13 @@ environment()
       DEBIAN \
       usr/bin \
       etc/efistub \
-      usr/share/bash-completions/completions \
+      usr/share/bash-completion/completions \
       usr/share/man/man1 \
       lib/stubload/scripts
 
     deb_control >./DEBIAN/control
     cp $BUILD/source/bin/stubload ./usr/bin/stubload
-    cp $BUILD/source/etc/completion ./usr/share/bash-completions/completions/stubload
+    cp $BUILD/source/etc/completion ./usr/share/bash-completion/completions/stubload
     cp -a $BUILD/source/lib/presets ./lib/stubload/presets
     cp $BUILD/source/lib/config.sh ./lib/stubload/config.sh
     gzip -kc $BUILD/source/etc/man1 >./usr/share/man/man1/stubload.1.gz
