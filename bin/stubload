@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 
-# errexit -- exit on errors
+# exit on errors
 set -o errexit
 
 fatal()
 {
-  # \e[1;31m -- change output to red
-  # \e[0m -- change output to default
+  # change output to red
   local red=$'\e[1;31m'
+
+  # change output to default
   local none=$'\e[0m'
 
-  # >&2 -- redirect stdout to stderr
-  echo $red"error:"$none "$@"
+  # >&2 will redirect stdout to stderr
+  echo $red"error:"$none "$@" >&2
 
-  if [ "$force" != true ]; then
+  if [ "$force" != 1 ]; then
     return 1
   fi
 }
@@ -22,14 +23,16 @@ match_entry()
 {
   local EFIDUMP=$(efibootmgr | xargs)
 
-  # Boot[0-9]{4}\* -- get 'BootNNNN*' (N = value from 0-9)
-  # EFIDUMP -- output of efibootmgr
+  # Boot[0-9]{4}\* will get 'BootNNNN*' (where N is a number)
+  # EFIDUMP is the output of efibootmgr, trapped in a variable to
+  # avoid unneeded repetition of efibootmgr, wasting time & CPU usage
   for preint in $(grep -E -o 'Boot[0-9]{4}\*' <<<"$EFIDUMP"); do
-    # grep -F -- get plain text only, no regex or grep experessions
-    if (grep -q -F "$preint $label HD(" <<<"$EFIDUMP"); then
-      # //[!0-9] -- remove all non-numbers
+    # grep -F will get plain text only, no fancy expressions
+    if grep -q -F "$preint $label HD(" <<<"$EFIDUMP"; then
+      # remove all non-numbers from int
       int="${preint//[!0-9]}"
       unset EFIDUMP
+      # stop for loop
       break
     fi
   done
@@ -37,34 +40,40 @@ match_entry()
 
 entry_exists()
 {
+  # get character length of int and compare it to 1
   if [ 1 -gt ${#int} ]; then
     match_entry
   fi
 
   # int should be 4 integers long (e.g. 0001)
-  ((${#int} == 4))
+  [ ${#int} = 4 ]
 }
 
 sub()
 {
   _run_main()
   {
-    if (command -v _cache_$1); then
-      _cache_$main
+    # command -v will check that a command is executable
+    if command -v _cache_$1; then
+      _cache_$1
     fi
-    _$main
+    _$1
   }
 
-  main="$1"
-  if ((${#NUMARGV[@]} > 0)); then
+  # check that character length of array NUMARGV is greater than 0
+  if [ ${#NUMARGV[@]} -gt 0 ]; then
     for i in ${NUMARGV[@]}; do
-      _run_main
+      # pass $1 (first arg) to _run_main
+      _run_main $1
     done
   else
-    # declare -i -- set integer variable
+    # declare -i will set an integer variable
     declare -i i=1
-    while (command -v entry_$i 1>/dev/null); do
-      _run_main
+    # 1>/dev/null will send all stdin/stdout to null
+    while command -v entry_$i 1>/dev/null; do
+      _run_main $1
+      # increment i by 1, 1 is taken as an integer and not
+      # a string since we declared i as an integer before
       i+=1
     done
   fi
@@ -82,14 +91,18 @@ version()
   TZONE='GMT'
   MAINTAINER='alemontn'
   
-  EVERSION=$(efibootmgr -V) EVERSION="${EVERSION//[!0-9]}"
+  # capture `efibootmgr -V` in a variable, remove all non-numbers
+  EVERSION=$(efibootmgr -V) \
+    EVERSION="${EVERSION//[!0-9]}"
 
   BVERSION=$(
     declare -i i=0
-    until (($i == 3)); do
+    until [ $i = 3 ]; do
+      # -n makes sure a newline ('\n') isn't printed
       echo -n ".${BASH_VERSINFO[$i]}"; i+=1
     done
   )
+  # remove the first period as it is unneeded
   BVERSION="${BVERSION#.}"
 
   echo $bold"$VERSION"$none
@@ -99,8 +112,9 @@ version()
 
 usage()
 {
-  # ${0/*\/} -- remove everything before '/' to
-  # get just executable name
+  # ${0##*/} will remove everything before '/' to get just executable name
+  # (e.g. '/usr/bin/stubload' turns to 'stubload')
+  # the same result can be achieved using `basename`
   echo \
 "\
 Usage: ${0##*/} [OPTION]...
@@ -126,33 +140,41 @@ Usage: ${0##*/} [OPTION]...
 
 summary()
 {
-  NUMARGVN="${NUMARGV[@]}" NUMARGVN=(${NUMARGVN// /, })
+  # capture array NUMARGV in NUMARGVN and then replace spaces with commas
+  NUMARGVN="${NUMARGV[@]}" \
+    NUMARGVN=(${NUMARGVN// /, })
 
-  if ((${#NUMARGVN[*]} < 1)); then
+  # compare char count of NUMARGVN to 1
+  if [ 1 -gt ${#NUMARGVN[*]} ]; then
     NUMARGVN=("all")
   fi
 
+  # QUEUE[3] will be set to remove_entry if the '-r'|'--remove' arg is provided
   if [ "${QUEUE[3]}" == "remove_entry" ]; then
     ASK[3]="Remove: ${NUMARGVN[*]}"
   fi
 
+  # when '-c'|'--create' is provided
   if [ "${QUEUE[4]}" == "create_entry" ]; then
     ASK[4]="Create: ${NUMARGVN[*]}"
   fi
 
-  if ((${#ASK[@]} > 0)); then
+  if [ ${#ASK[@]} -gt 0 ]; then
     echo "The following actions will be performed:"
 
-    # '%s\n' -- print each entry in variable and newline
+    # print each entry in variable and newline
     printf -- '- %s\n' "${ASK[@]}"
 
     _ask()
     {
       read -p "Is this okay? [y/n] " yn
 
+      # ,, will change all uppercase to lowercase
+      # (^^ will do the opposite)
       case "${yn,,}" in
         "yes"|"y") ret=0 ;;
         "no"|"n") ret=1 ;;
+        # repeat if invalid input is given
         *) _ask ;;
       esac
       return $ret
@@ -163,39 +185,30 @@ summary()
 
 config_arg()
 {
+  # make sure that the config file arg doesn't stay in string args
   config="${STRARGV[0]}"
   STRARGV="${STRARGV[*]#$config}"
 }
 
 edit_config()
 {
-  if ((${#EDITOR} < 1)); then
+  if [ 1 -gt ${#EDITOR} ] ; then
     EDITOR=vi
   fi
+  # +%s will get unix milliseconds
   TMP="$config_dir/$config_base-$(date +%s).tmp"
 
   cp "$config" "$TMP"
   $EDITOR "$TMP"
 
-  if (cmp -s $config $TMP); then
+  # cmp -s will compare two files and then redirect all output to null
+  if cmp -s $config $TMP; then
     rm -f "$TMP"
     echo "$config: no changes made"
   else
     mv "$TMP" "$config"
     echo "$config: saved changes"
   fi
-}
-
-get_cmdline()
-{
-  _get_cmdline()
-  {
-    entry_$i; match_entry
-
-    echo "$i|$unicode"
-  }
-
-  sub $FUNCNAME
 }
 
 add_cmdline()
@@ -207,10 +220,16 @@ add_cmdline()
     confin
 
     orig_unicode="$unicode"
-    unicode="$unicode ${STRARGV[@]}"
 
-    echo "${CONFIN/$orig_unicode/$unicode}" >$config
-    echo "${STRARGV[@]}: added to cmdline"
+    # add all string args to unicode
+    unicode+=" ${STRARGV[@]}"
+
+    # $CONFIN will capture the configuration file in a variable to
+    # make it easier to deal with and prevent modifications
+
+    # replace $orig_unicode with $unicode in $CONFIN
+    echo "${CONFIN/$orig_unicode/$unicode}" >"$config"
+    echo "${STRARGV[@]}: added to cmdline for entry $i"
   }
 
   sub $FUNCNAME
@@ -225,10 +244,12 @@ rm_cmdline()
     confin
 
     orig_unicode="$unicode"
+    
+    # remove all strings args from 'unicode'
     unicode="${unicode/${STRARGV[@]}}" unicode=$(xargs <<<"$unicode")
 
-    echo "${CONFIN/$orig_unicode/$unicode}" >$config
-    echo "${STRARGV[@]}: removed from cmdline"
+    echo "${CONFIN/$orig_unicode/$unicode}" >"$config"
+    echo "${STRARGV[@]}: removed from cmdline for entry $i"
   }
 
   sub $FUNCNAME
@@ -243,10 +264,14 @@ list_entry()
   {
     entry_$i; match_entry
 
-    if (entry_exists); then
+    if entry_exists; then
+      # int is the boot number according to efibootmgr,
+      # i is from the configuration file (entry_i)
       echo "$int|$i $label"
-      if [ "$verbose" == true ]; then
-        echo ' '$bold"$target"$none "$unicode"
+
+      # bash can't handle booleans, so '1' (true) is stored as an integer
+      if [ "$verbose" = 1 ]; then
+        echo " "$bold"$target"$none "$unicode"
       fi
     fi
   }
@@ -258,12 +283,19 @@ remove_entry()
 {
   _cache_remove_entry()
   {
+    # read will take a line as input, instead of a string, etc
     while read line; do
-      eval $line
-      if (entry_exists); then
+      # since we can't source the line (because it's not a file),
+      # we use 'eval' to take 'line' as a command (int=NNNN)
+      eval "$line"
+
+      if entry_exists; then
         echo "remove: $int"
+        # &>>$log will redirect stdin, stdout & stderr to the log file
         efibootmgr -B -b "$int" &>>$log || unset int
       fi
+    
+    # < will take a file (cachefile) as input for 'read'
     done </lib/stubload/cachefile
   }
 
@@ -272,12 +304,18 @@ remove_entry()
     entry_$i
 
     echo "remove: $label "
-    until (! entry_exists); do
+    until ! entry_exists; do
       match_entry
-      if ((${#int} == 4)); then
-        efibootmgr -B -b "$int" &>>$log &&
-          sed "s/int=$int//" </lib/stubload/cachefile | xargs >/lib/stubload/cachefile ||
-          unset int
+
+      if [ ${#int} = 4 ]; then
+        efibootmgr -B -b "$int" &>>$log \
+          && # if exit status is 0
+            # capture the cachefile into a variable, and then remove int=$int
+            # and save the cachefile
+            CACHE_TMP=$(</lib/stubload/cachefile) CACHE_TMP="${CACHE_TMP#int=$int}" \
+            echo "$CACHE_TMP" >/lib/stubload/cachefile \
+            || # if exit status of efibootmgr is non-zero
+              unset int
       fi
     done
   }
@@ -287,16 +325,19 @@ remove_entry()
 
 create_entry()
 {
-  # add a '.' to the front of a script's name to disable it
-  for script in $(ls -1 -d /lib/stubload/scripts/*.sh 2>/dev/null); do
-    source "$script" &>>$log
+  # add a '.' to the front of a script's name to disable it,
+  # 'ls' will ignore files with '.' unless '-A' or '-a' is given
+
+  # grep will look for files ending in '.sh' (shell scripts)
+  for script in $(ls /lib/stubload/scripts | grep -F '.sh' 2>/dev/null); do
+    source /lib/stubload/scripts/"$script" &>>$log
   done
 
   _create_entry()
   {
     entry_$i
 
-    if (entry_exists && ! [ "$force" == true ]); then
+    if entry_exists && [ "$force" != 1 ]; then
       fatal \
         "$label: entry already exists"\
         $'\n'"use '--force' to ignore or '--remove' to replace it"
@@ -307,21 +348,27 @@ create_entry()
     local part="$part"
 
     # get path of target relative to mount point
-    if (! grep -q " $boot_dir " </proc/mounts); then
+    if ! grep -q " $boot_dir " </proc/mounts; then
       base_mount=$(grep "$part " </proc/mounts | cut -d' ' -f2)
-      target="${boot_dir#$base_mount}/$target"
+      mp_dir="${boot_dir#$base_mount}"
+
+      target="$mp_dir/$target"
+      ramdisk="$mp_dir/$target"
     fi
 
+    # remove /dev/ from part
+    # (e.g. /dev/nvme0n1p1 -> nvme0n1p1)
     case "${part#/dev/}" in
       "nvme"*|"mmcblk"*)
-        # '//p*' -- remove 'p' & everything after 'p'
-        # '//*p' -- remove 'p' & everything before 'p'
+        # '//p*' will remove 'p' & everything after 'p'
+        # '//*p' is for everything before 'p'
         local disk="${part//p*}"
         local part_int="${part//*p}"
         ;;
       "sd"*)
-        # '//[!0-9]' -- remove all non-numbers
-        local disk="${part//sd*}"
+        # (e.g. sda5 -> sda)
+        local disk="${part//[0-9]}"
+        # remove all non-numbers from part
         local part_int="${part//[!0-9]}"
         ;;
       *)
@@ -333,6 +380,9 @@ create_entry()
     efibootmgr -c -d "$disk" -p "$part_int" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" &>>$log
 
     match_entry
+
+    # if the entry's label changes and becomes unidentifiable by 'match_entry',
+    # then the entry stored in the cachefile will be removed
     echo "int=$int" >>/lib/stubload/cachefile
     unset int
   }
@@ -349,10 +399,14 @@ main()
         ;;
       "-n"*)
         NUMARGV+=( "${ARG//[!0-9]}" )
-        set -- ${@/$ARG}
+        # remove NUMARG from all args, since it no longer means anything
+        set -- ${@#$ARG}
         ;;
       "-"*)
-        # fold -w1 <<<"${ARG/-}" -- add spaces between each argument
+        # this is for correctly parsing short args,
+        # (e.g. -lv -> -l -v)
+
+        # fold -w1 will add spaces between each argument
         for SHORTARG in $(fold -w1 <<<"${ARG/-}" | xargs); do
           set -- "-$SHORTARG" ${@#-$SHORTARG}
         done
@@ -363,36 +417,41 @@ main()
   _queue()
   {
     case "$1" in
+      # argint makes it so everything arg provided is executed in the correct order
+      # (e.g. -c -v -r becomes verbose -> remove_entry -> create_entry)
       "version"|"usage"|"list_entry"|"remove_entry"|"edit_config"|"cmdline")
-        i=3
+        argint=3
         ;;
       "create_entry")
-        i=4
+        argint=4
         ;;
       "add_cmdline"|"rm_cmdline")
-        i=2
+        argint=2
         ;;
       "summary")
-        i=1
+        argint=1
         ;;
       "config_arg")
-        i=0
+        argint=0
         ;;
     esac
 
-    if ((${#QUEUE[$i]} > 0)); then
+    if [ ${#QUEUE[$i]} -gt 0 ]; then
       fatal "conflicting arguments provided"
     fi
 
     QUEUE[$i]="$1"
   }
 
+  # unless log changes (provided by '-v'|'--verbose' argument),
+  # everything sent to log is sent to null
   log=/dev/null
 
-  while (($# > 0)); do
+  # until $@ is empty
+  while [ $# -gt 0 ]; do
     case "$1" in
-      "--force") force=true ;;      
-      "--verbose"|"-v") verbose=true log=/dev/stderr ;;
+      "--force") force=1 ;;      
+      "--verbose"|"-v") verbose=1 log=/dev/stderr ;;
       "--config") _queue "config_arg" ;;
       "--prompt"|"-i") _queue "summary" ;;
       "--version"|"-V") _queue "version" ;;
@@ -407,23 +466,26 @@ main()
       "--"*|"-"*) fatal "unrecognised option -- ${1##-}" ;;
       *) STRARGV+=( "$1" ) ;;
     esac
+    # shift will move $2 (second arg) to $1 (whether its empty or not)
     shift
   done
 
-  if ((${#QUEUE[@]} < 1)); then
+  if [ 1 -gt ${#QUEUE[@]} ]; then
     _queue "usage"
   fi
 
   for each in ${QUEUE[@]}; do
     case "$each" in
+      # only args that require the configuration file are provided here
       "edit_config"|"get_cmdline"|"add_cmdline"|"rm_cmdline"|"list_entry"|"remove_entry"|"create_entry")
-        if [ "$config_srcd" != true ]; then
+        if [ "$config_srcd" != 1 ]; then
           source /lib/stubload/config.sh
         fi
-        config_srcd=true
+        config_srcd=1
         ;;
     esac
     "$each"
   done
 }
+# keep all args provided to main
 main $@
