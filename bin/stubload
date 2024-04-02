@@ -12,7 +12,7 @@ fatal()
   local none=$'\e[0m'
 
   # >&2 will redirect stdout to stderr
-  echo $red"error:"$none "$@" >&2
+  echo $red"error:"$none "$*" >&2
 
   if [ "$force" != 1 ]; then
     return 1
@@ -30,7 +30,7 @@ match_entry()
     # grep -F will get plain text only, no fancy expressions
     if grep -q -F "$preint $label HD(" <<<"$EFIDUMP"; then
       # remove all non-numbers from int
-      int="${preint//[!0-9]}"
+      int="${preint#Boot}" int="${int/\*}"
       unset EFIDUMP
       # stop for loop
       break
@@ -51,27 +51,18 @@ entry_exists()
 
 sub()
 {
-  _run_main()
-  {
-    # command -v will check that a command is executable
-    if command -v _cache_$1; then
-      _cache_$1
-    fi
-    _$1
-  }
-
   # check that character length of array NUMARGV is greater than 0
   if [ ${#NUMARGV[@]} -gt 0 ]; then
     for i in ${NUMARGV[@]}; do
       # pass $1 (first arg) to _run_main
-      _run_main $1
+      _$1
     done
   else
     # declare -i will set an integer variable
     declare -i i=1
     # 1>/dev/null will send all stdin/stdout to null
     while command -v entry_$i 1>/dev/null; do
-      _run_main $1
+      _$1
       # increment i by 1, 1 is taken as an integer and not
       # a string since we declared i as an integer before
       i+=1
@@ -281,24 +272,6 @@ list_entry()
 
 remove_entry()
 {
-  _cache_remove_entry()
-  {
-    # read will take a line as input, instead of a string, etc
-    while read line; do
-      # since we can't source the line (because it's not a file),
-      # we use 'eval' to take 'line' as a command (int=NNNN)
-      eval "$line"
-
-      if entry_exists; then
-        echo "remove: $int"
-        # &>>$log will redirect stdin, stdout & stderr to the log file
-        efibootmgr -B -b "$int" &>>$log || unset int
-      fi
-    
-    # < will take a file (cachefile) as input for 'read'
-    done </lib/stubload/cachefile
-  }
-
   _remove_entry()
   {
     entry_$i
@@ -308,14 +281,9 @@ remove_entry()
       match_entry
 
       if [ ${#int} = 4 ]; then
-        efibootmgr -B -b "$int" &>>$log \
-          && # if exit status is 0
-            # capture the cachefile into a variable, and then remove int=$int
-            # and save the cachefile
-            CACHE_TMP=$(</lib/stubload/cachefile) CACHE_TMP="${CACHE_TMP#int=$int}" \
-            echo "$CACHE_TMP" >/lib/stubload/cachefile \
-            || # if exit status of efibootmgr is non-zero
-              unset int
+        efibootmgr -B -b "$int" &>>$log ||
+          # ignore if efibootmgr's exit status is non-zero
+          unset int
       fi
     done
   }
@@ -350,10 +318,12 @@ create_entry()
     # get path of target relative to mount point
     if ! grep -q " $boot_dir " </proc/mounts; then
       base_mount=$(grep "$part " </proc/mounts | cut -d' ' -f2)
-      mp_dir="${boot_dir#$base_mount}"
+      mp_dir="${boot_dir#$base_mount}" \
+        # replace '/' with '\'
+        mp_dir="${mp_dir//\//\\}"
 
       target="$mp_dir/$target"
-      ramdisk="$mp_dir/$target"
+      ramdisk="$mp_dir/$ramdisk"
     fi
 
     # remove /dev/ from part
@@ -378,13 +348,6 @@ create_entry()
 
     echo "create: $label "
     efibootmgr -c -d "$disk" -p "$part_int" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" &>>$log
-
-    match_entry
-
-    # if the entry's label changes and becomes unidentifiable by 'match_entry',
-    # then the entry stored in the cachefile will be removed
-    echo "int=$int" >>/lib/stubload/cachefile
-    unset int
   }
 
   sub $FUNCNAME
@@ -436,11 +399,12 @@ main()
         ;;
     esac
 
-    if [ ${#QUEUE[$i]} -gt 0 ]; then
+    if [ ${#QUEUE[$argint]} -gt 0 ]; then
       fatal "conflicting arguments provided"
     fi
 
-    QUEUE[$i]="$1"
+    QUEUE[$argint]="$1"
+    unset i
   }
 
   # unless log changes (provided by '-v'|'--verbose' argument),
@@ -488,4 +452,4 @@ main()
   done
 }
 # keep all args provided to main
-main $@
+main $*
