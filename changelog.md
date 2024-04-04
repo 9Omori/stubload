@@ -8,7 +8,7 @@ v0.1.4:
 + Move all configuration stuff (-> lib/config.sh)
 + Add manpage (stubload(1))
 + Fix not being able to find mountpoint of subdirectories (grep -> df)
-+ Add cachefile for when entry's label changes (/lib/stubload/cachefile)
++ Add support for multiple ramdisks
 
 v0.1.3:
 + Improve argument parsing method (again) & general code

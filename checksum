@@ -54,3 +54,10 @@ b8f72b0a7eb5bba8e5a8971d5f703c7df1924277  lib/config.sh
 70dfcba6a050f7b6046576ac34d86f8a14b653f4  lib/config.sh
 ad65c6fe69c21cd6da70a03a59e5c70dc0081f0f  etc/stubload.conf
 348cfbfdeda4f5e69be7e6faf446e80f0354a72c  etc/completion
+
+# 17:05 | 04/04/2024
+9efb1a41b73016cb138807414186d6b0c7da51d5  build.sh
+aa333c72c28db8a073a8d78545868fc93e400153  bin/stubload
+fb414dc1432291ca747a1f8235b04113fe3e6bda  lib/config.sh
+ad65c6fe69c21cd6da70a03a59e5c70dc0081f0f  etc/stubload.conf
+348cfbfdeda4f5e69be7e6faf446e80f0354a72c  etc/completion
