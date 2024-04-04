@@ -1,2 +1,4 @@
 target "vmlinuz-linux"
-ramdisk "initramfs-linux.img"
+ramdisk "initramfs-linux.img" #\
+ #"intel-ucode.img" #\
+ #"amd-ucode.img"

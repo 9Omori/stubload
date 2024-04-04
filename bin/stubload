@@ -14,7 +14,7 @@ fatal()
   # >&2 will redirect stdout to stderr
   echo $red"error:"$none "$*" >&2
 
-  if [ "$force" != 1 ]; then
+  if [ "$force" -ne 1 ]; then
     return 1
   fi
 }
@@ -46,15 +46,24 @@ entry_exists()
   fi
 
   # int should be 4 integers long (e.g. 0001)
-  [ ${#int} = 4 ]
+  [ ${#int} -eq 4 ]
+}
+
+entry()
+{
+  entry_$i
+
+  # assort through ramdisks
+  for ramdisk in ${ramdisks[*]}; do
+    unicode+=" initrd=$ramdisk "
+  done
 }
 
 sub()
 {
   # check that character length of array NUMARGV is greater than 0
-  if [ ${#NUMARGV[@]} -gt 0 ]; then
-    for i in ${NUMARGV[@]}; do
-      # pass $1 (first arg) to _run_main
+  if [ ${#NUMARGV[*]} -gt 0 ]; then
+    for i in ${NUMARGV[*]}; do
       _$1
     done
   else
@@ -88,7 +97,7 @@ version()
 
   BVERSION=$(
     declare -i i=0
-    until [ $i = 3 ]; do
+    until [ $i -eq 3 ]; do
       # -n makes sure a newline ('\n') isn't printed
       echo -n ".${BASH_VERSINFO[$i]}"; i+=1
     done
@@ -132,7 +141,7 @@ Usage: ${0##*/} [OPTION]...
 summary()
 {
   # capture array NUMARGV in NUMARGVN and then replace spaces with commas
-  NUMARGVN="${NUMARGV[@]}" \
+  NUMARGVN="${NUMARGV[*]}" \
     NUMARGVN=(${NUMARGVN// /, })
 
   # compare char count of NUMARGVN to 1
@@ -150,7 +159,7 @@ summary()
     ASK[4]="Create: ${NUMARGVN[*]}"
   fi
 
-  if [ ${#ASK[@]} -gt 0 ]; then
+  if [ ${#ASK[*]} -gt 0 ]; then
     echo "The following actions will be performed:"
 
     # print each entry in variable and newline
@@ -206,14 +215,14 @@ add_cmdline()
 {
   _add_cmdline()
   {
-    entry_$i
+    entry
 
     confin
 
     orig_unicode="$unicode"
 
     # add all string args to unicode
-    unicode+=" ${STRARGV[@]}"
+    unicode+=" ${STRARGV[*]}"
 
     # $CONFIN will capture the configuration file in a variable to
     # make it easier to deal with and prevent modifications
@@ -230,7 +239,7 @@ rm_cmdline()
 {
   _rm_cmdline()
   {
-    entry_$i
+    entry
 
     confin
 
@@ -240,7 +249,7 @@ rm_cmdline()
     unicode="${unicode/${STRARGV[@]}}" unicode=$(xargs <<<"$unicode")
 
     echo "${CONFIN/$orig_unicode/$unicode}" >"$config"
-    echo "${STRARGV[@]}: removed from cmdline for entry $i"
+    echo "${STRARGV[*]}: removed from cmdline for entry $i"
   }
 
   sub $FUNCNAME
@@ -253,7 +262,7 @@ list_entry()
 
   _list_entry()
   {
-    entry_$i; match_entry
+    entry; match_entry
 
     if entry_exists; then
       # int is the boot number according to efibootmgr,
@@ -261,7 +270,7 @@ list_entry()
       echo "$int|$i $label"
 
       # bash can't handle booleans, so '1' (true) is stored as an integer
-      if [ "$verbose" = 1 ]; then
+      if [ "$verbose" -eq 1 ]; then
         echo " "$bold"$target"$none "$unicode"
       fi
     fi
@@ -274,13 +283,13 @@ remove_entry()
 {
   _remove_entry()
   {
-    entry_$i
+    entry
 
     echo "remove: $label "
     until ! entry_exists; do
       match_entry
 
-      if [ ${#int} = 4 ]; then
+      if [ ${#int} -eq 4 ]; then
         efibootmgr -B -b "$int" &>>$log ||
           # ignore if efibootmgr's exit status is non-zero
           unset int
@@ -303,7 +312,7 @@ create_entry()
 
   _create_entry()
   {
-    entry_$i
+    entry
 
     if entry_exists && [ "$force" != 1 ]; then
       fatal \
@@ -347,7 +356,7 @@ create_entry()
     esac
 
     echo "create: $label "
-    efibootmgr -c -d "$disk" -p "$part_int" -L "$label" -l "$target" -u "initrd=\\$ramdisk $unicode" | grep "$label" &>>$log
+    efibootmgr -c -d "$disk" -p "$part_int" -L "$label" -l "$target" -u "$unicode" | grep "$label" &>>$log
   }
 
   sub $FUNCNAME

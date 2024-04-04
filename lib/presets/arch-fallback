@@ -1,2 +1,4 @@
 target "vmlinuz-linux"
-ramdisk "initramfs-linux-fallback.img"
+ramdisk "initramfs-linux-fallback.img" #\
+ #"intel-ucode.img" #\
+ #"amd-ucode.img"

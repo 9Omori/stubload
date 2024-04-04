@@ -27,7 +27,7 @@ target()
 
 ramdisk()
 {
-  ramdisk="$1"
+  ramdisks=( $* )
 }
 
 dir()
