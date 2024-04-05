@@ -1,48 +1,36 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # exit on errors
 set -o errexit
-
 # print executed commands
 set -o xtrace
 
-meta()
-{
-  VERSION='0.1.4'
-  FULL_VERSION='0.1.4-5'
-  DESCRIPTION="a bash script that interfaces with efibootmgr to create a boot entry for the Linux kernel"
-  DEPENDENCIES=('bash' 'efibootmgr' 'coreutils' 'grep')
-}
+# build definitions
+. ./build.conf
 
 fatal()
 {
-  local red=$'\e[1;31m'
-  local none=$'\e[0m'
+  # change output to red
+  local red='\e[1;31m'
 
-  echo $red"error:"$none "$1" >&2
+  # change output to default
+  local none='\e[0m'
+
+  echo -e $red"error:"$none "$1" >&2
   return 1
 }
-
-GIT_REPO='https://github.com/alemontn/stubload.git'
-PKGS=(rpm git tar zstd gzip)
 
 BUILD="$PWD/build"
 OUT="$BUILD/out"
 
-STRUCTURES=(deb/build rpmbuild rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} tar)
-
 # root UID = 0
-if (($UID > 0)); then
+if [ $(id -u) -ne 0 ]; then
   sudo $0 $@
   exit
 fi
 
-[ -d "$BUILD" ] || mkdir "$BUILD"
-[ -d ".git" ] || fatal "build.sh must be ran in the GitHub repository"
-
 rpm_spec()
 {
-  meta
   echo >&1 \
 "\
 Name: stubload
@@ -53,7 +41,7 @@ BuildArch: noarch
 License: MPL-2.0
 Source0: %{name}-%{version}.tgz
 
-Requires: ${DEPENDENCIES[*]}
+Requires: $DEPENDENCIES
 
 %description
 %{summary}
@@ -71,6 +59,7 @@ cp %{name} \$RPM_BUILD_ROOT/usr/bin/%{name}
 cp completion \$RPM_BUILD_ROOT/usr/share/bash-completion/completions/%{name}
 cp -a presets \$RPM_BUILD_ROOT/lib/stubload/presets
 cp config.sh \$RPM_BUILD_ROOT/lib/stubload/config.sh
+cp common.sh \$RPM_BUILD_ROOT/lib/stubload/common.sh
 gzip -kc man1 >\$RPM_BUILD_ROOT/usr/share/man/man1/stubload.1.gz
 
 %clean
@@ -87,15 +76,14 @@ rm -rf \$RPM_BUILD_ROOT
 /lib/stubload/presets/fedora-rescue
 /lib/stubload/scripts/
 /lib/stubload/config.sh
+/lib/stubload/common.sh
 /etc/efistub/\
 "
 }
 
 deb_control()
 {
-  meta
-  DEB_DEPENDENCIES=$(printf ' ,%s' "${DEPENDENCIES[*]}")
-  DEB_DEPENDENCIES=(${DEB_DEPENDENCIES# ,})
+  DEB_DEPENDENCIES=$(printf ' ,%s' "$DEPENDENCIES" | sed "s| ,||")
   echo >&1 \
 "\
 Package: stubload
@@ -105,17 +93,20 @@ Priority: optional
 Architecture: all
 Maintainer: alemontn <118671833+alemontn@users.noreply.github.com>
 Description: $DESCRIPTION
-Depends: ${DEB_DEPENDNECIES[*]}
+Depends: $DEB_DEPENDNECIES
 Recommends: man\
 "
 }
 
 structure()
 {
+  [ -d $BUILD ] || mkdir $BUILD
+  [ -d .git ] || fatal "build.sh must be ran in the GitHub repository"
+
   cd $BUILD
 
-  mkdir -p "${STRUCTURES[@]}"
-  mkdir "$OUT"
+  mkdir -p $STRUCTURES
+  mkdir $OUT
   
   ln -s .. source
 }
@@ -127,8 +118,8 @@ dependencies()
     pacman --noconfirm -Syy ||
     emerge --ask --sync
   
-  for PKG in ${PKGS[@]}; do
-    if (! command -v "$PKG" >/dev/null); then
+  for PKG in $PKGS; do
+    if ! command -v "$PKG" >/dev/null; then
       apt -y install "$PKG" ||
         dnf -y install "$PKG" ||
         pacman --noconfirm -S "$PKG" ||
@@ -156,6 +147,7 @@ environment()
     cp $BUILD/source/etc/completion ./usr/share/bash-completion/completions/stubload
     cp -a $BUILD/source/lib/presets ./lib/stubload/presets
     cp $BUILD/source/lib/config.sh ./lib/stubload/config.sh
+    cp $BUILD/source/lib/common.sh ./lib/stubload/common.sh
     gzip -kc $BUILD/source/etc/man1 >./usr/share/man/man1/stubload.1.gz
 
     chmod +x usr/bin/stubload
@@ -174,6 +166,7 @@ environment()
     cp $BUILD/source/bin/stubload $BUILD/source/etc/completion stubload/
     cp -a $BUILD/source/lib/presets stubload/presets
     cp $BUILD/source/lib/config.sh stubload/config.sh
+    cp $BUILD/source/lib/common.sh stubload/common.sh
     cp $BUILD/source/etc/man1 stubload/man1
 
     chmod +x ./stubload/stubload
@@ -198,6 +191,7 @@ environment()
     cp ../source/etc/completion ./usr/share/bash-completion/completions/stubload
     cp -a ../source/lib/presets ./lib/stubload/presets
     cp ../source/lib/config.sh ./lib/stubload/config.sh
+    cp ../source/lib/common.sh ./lib/stubload/common.sh
     gzip -kc ../source/etc/man1 >./usr/share/man/man1/stubload.1.gz
 
     chmod +x ./usr/bin/stubload
@@ -231,9 +225,8 @@ build_package()
     mv *.tzst $OUT
   }
 
-  meta
-  for pkg in $OUT/*.{rpm,deb,tzst}; do
-    pkgformat="${pkg/*.}"
+  for pkg in $OUT/*.rpm $OUT/*.deb $OUT/*.tzst; do
+    pkgformat=$(echo "$pkg" | sed "s/.*\.//")
     new="stubload-$FULL_VERSION.allarch.$pkgformat"
     mv $pkg $OUT/$new
   done

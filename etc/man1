@@ -5,10 +5,10 @@ stubload \- manual page for stubload
 
 .SH "SYNOPSIS"
 .B stubload
-.RB [ "\-hvViCARlcr" ]
+.RB [ "\-hvViCGedARlcr" ]
 .RB [ "\-n[#]" ]
 .RB [ "\-\-force" ]
-.RB [ "\-\-verbose" ]
+.RB [ "\-\-config=[file]" ]
 
 .SH "DESCRIPTION"
 .B stubload
@@ -34,6 +34,12 @@ prompt before performing potentially dangerous actions
 edit configuration file located at
 /etc/efistub/stubload.conf
 .TP
+\fB\-e\fR, \fB\-\-enable\fR
+enable entries
+.TP
+\fB\-d\fR, \fB\-\-disable\fR
+disable entries
+.TP
 \fB\-A\fR, \fB\-\-add_cmdline\fR
 add option to kernel cmdline (global by default,
 use '-n' to select entry)
@@ -53,7 +59,7 @@ remove entries
 \fB\-\-force\fR
 stop errors from exiting
 .TP
-\fB\-\-config\fR [file]
+\fB\-\-config\fR=[file]
 specify configuration file
 .TP
 \fB\-n\fR[#]
@@ -66,8 +72,8 @@ specify entrys number to target
 .nf
 .B
 # stubload -n1 -n2 -c
-create: Entry 1
-create: Entry 2
+create: Linux
+create: Linux (rescue)
 .fi
 \fR
 .SS "List entries created by stubload with cmdlines:"
@@ -75,10 +81,10 @@ create: Entry 2
 .nf
 .B
 # stubload -lv
-0000|1 Entry 1
+0000|1 Linux
  vmlinuz root=/dev/root ro quiet nosplash
-0001|2 Entry 2
- vmlinuz root=/dev/root ro quiet nosplash
+0001|2 Linux (rescue)
+ vmlinuz-rescue root=/dev/root ro loglevel=3 nosplash
 .fi
 \fR
 .SS "Add fbcon=nodefer to cmdline for entry 1 and 2:"
@@ -86,8 +92,8 @@ create: Entry 2
 .nf
 .B
 # stubload -n1 -n2 -A "fbcon=nodefer"
-fbcon=nodefer: Added to cmdline
-fbcon=nodefer: Added to cmdline
+fbcon=nodefer: Added to cmdline for entry 1
+fbcon=nodefer: Added to cmdline for entry 2
 .fi
 
 .SH "SEE ALSO"

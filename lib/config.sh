@@ -4,18 +4,16 @@ if [ ! -f "$config" ]; then
   config=/etc/efistub/stubload.conf
 fi
 
-config_dir=$(dirname "$config")
-config_base=$(basename "$config")
+# get just 'stubload.conf' from '/etc/efistub/stubload.conf'
+config_base="${config##*/}"
+config_dir="${config/$config_base}"
 
-confin()
-{
-  # capture config file content in a variable
-  CONFIN=$(<"$config")
-}
+# capture configuration file in a variable
+CONFIN=$(<"$config")
 
 target()
 {
-  case "$1" in
+  case "$1" in 
     "-p"|"--preset")
       source /lib/stubload/presets/"$2" &>>$log
       ;;
@@ -43,6 +41,11 @@ label()
 cmdline()
 {
   unicode="$1"
+}
+
+disabled()
+{
+  disabled=1
 }
 
 source "$config"

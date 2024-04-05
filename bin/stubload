@@ -3,18 +3,26 @@
 # exit on errors
 set -o errexit
 
+# get variable definition
+source /lib/stubload/common.sh
+
 fatal()
 {
   # change output to red
-  local red=$'\e[1;31m'
+  local red=$(echo -e '\e[1;31m')
 
   # change output to default
-  local none=$'\e[0m'
+  local none=$(echo -e '\e[0m')
 
   # >&2 will redirect stdout to stderr
-  echo $red"error:"$none "$*" >&2
+  echo $red"error:"$none >&2
 
-  if [ "$force" -ne 1 ]; then
+  # until $@ is empty ($# is the count of $@)
+  while [ $# -ne 0 ]; do
+    echo " $1" >&2; shift
+  done
+
+  if [ $force -ne 1 ]; then
     return 1
   fi
 }
@@ -49,13 +57,18 @@ entry_exists()
   [ ${#int} -eq 4 ]
 }
 
-entry()
+source_entry()
 {
+  disabled=0
   entry_$i
+
+  if [ $disabled -ne 0 ]; then
+    return 1
+  fi
 
   # assort through ramdisks
   for ramdisk in ${ramdisks[*]}; do
-    unicode+=" initrd=$ramdisk "
+    unicode+=" initrd=$ramdisk"
   done
 }
 
@@ -81,13 +94,13 @@ sub()
 
 version()
 {
-  local bold=$'\e[1m'
-  local none=$'\e[0m'
+  local bold=$(echo -e '\e[1m')
+  local none=$(echo -e '\e[0m')
 
-  VERSION='0.1.4-5'
-  VERSION_CODE=17
-  TIME='22:56'
-  DATE='01/04/2024'
+  VERSION='0.1.5'
+  VERSION_CODE=18
+  TIME='00:48'
+  DATE='06/04/2024'
   TZONE='GMT'
   MAINTAINER='alemontn'
   
@@ -124,7 +137,8 @@ Usage: ${0##*/} [OPTION]...
  -V, --version       print version
  -i, --prompt        prompt before performing potentially dangerous actions
  -C, --edit_config   edit configuration file
- -G, --cmdline       get current cmdline
+ -e, --enable        enable entries
+ -d, --disable       disable entries
  -A, --add_cmdline   add option to kernel cmdline
  -R, --rm_cmdline    remove option from kernel cmdline
  -l, --list          list entries
@@ -133,7 +147,7 @@ Usage: ${0##*/} [OPTION]...
  -n[#]               specify entry's number to target
 
  --force             ignore errors
- --config [file]     specify configuration file
+ --config=[file]     specify configuration file
 " &&
     exit 0
 }
@@ -150,12 +164,12 @@ summary()
   fi
 
   # QUEUE[3] will be set to remove_entry if the '-r'|'--remove' arg is provided
-  if [ "${QUEUE[3]}" == "remove_entry" ]; then
+  if [ "${QUEUE[2]}" == "remove_entry" ]; then
     ASK[3]="Remove: ${NUMARGVN[*]}"
   fi
 
   # when '-c'|'--create' is provided
-  if [ "${QUEUE[4]}" == "create_entry" ]; then
+  if [ "${QUEUE[3]}" == "create_entry" ]; then
     ASK[4]="Create: ${NUMARGVN[*]}"
   fi
 
@@ -163,7 +177,7 @@ summary()
     echo "The following actions will be performed:"
 
     # print each entry in variable and newline
-    printf -- '- %s\n' "${ASK[@]}"
+    printf -- ' * %s\n' "${ASK[@]}"
 
     _ask()
     {
@@ -181,13 +195,6 @@ summary()
     }
     _ask
   fi
-}
-
-config_arg()
-{
-  # make sure that the config file arg doesn't stay in string args
-  config="${STRARGV[0]}"
-  STRARGV="${STRARGV[*]#$config}"
 }
 
 edit_config()
@@ -215,9 +222,7 @@ add_cmdline()
 {
   _add_cmdline()
   {
-    entry
-
-    confin
+    source_entry || return 0
 
     orig_unicode="$unicode"
 
@@ -239,12 +244,9 @@ rm_cmdline()
 {
   _rm_cmdline()
   {
-    entry
-
-    confin
+    source_entry || return 0
 
     orig_unicode="$unicode"
-    
     # remove all strings args from 'unicode'
     unicode="${unicode/${STRARGV[@]}}" unicode=$(xargs <<<"$unicode")
 
@@ -255,24 +257,83 @@ rm_cmdline()
   sub $FUNCNAME
 }
 
+entry_scope()
+{
+  scope="${CONFIN/*entry_$i}"
+  scope="${scope/\}*}" \
+   scope="${scope/*()*\{}"
+
+  orig_scope="$scope"
+}
+
+enable()
+{
+  _enable()
+  {
+    source_entry && fatal "entry '$label' is already enabled"
+
+    entry_scope
+
+    scope="${scope/disabled/#disabled}"
+
+    echo "${CONFIN/$orig_scope/$scope}" >"$config"
+    echo "$label: enabled"
+  }
+
+  sub $FUNCNAME
+}
+
+disable()
+{
+  _disable()
+  {
+    source_entry || fatal "entry '$label' is already disabled"
+
+    if entry_exists; then
+      fatal "entry already exists, remove before disabling"
+    fi
+
+    entry_scope
+
+    TAB_SIZE="${scope//[A-Z]*}"
+    TAB_SIZE="${TAB_SIZE//[a-z]*}"
+
+    if grep -q "#disabled" <<<"$scope"; then
+      scope="${scope/\#disabled/disabled}"
+    else
+      scope="${TAB_SIZE}disabled"$'\n'"$scope"
+    fi
+
+    echo "${CONFIN/$orig_scope/$scope}" >"$config"
+    echo "$label: disabled"
+  }
+  
+  sub $FUNCNAME
+}
+
 list_entry()
 {
-  local bold=$'\e[1m'
-  local none=$'\e[0m'
+  local bold=$(echo -e '\e[1m')
+  local none=$(echo -e '\e[0m')
 
   _list_entry()
   {
-    entry; match_entry
+    enabled="enabled"
+    source_entry || enabled="disabled"
 
     if entry_exists; then
-      # int is the boot number according to efibootmgr,
-      # i is from the configuration file (entry_i)
-      echo "$int|$i $label"
+      exists="$int"
+    else
+      exists="not created"
+    fi
 
-      # bash can't handle booleans, so '1' (true) is stored as an integer
-      if [ "$verbose" -eq 1 ]; then
-        echo " "$bold"$target"$none "$unicode"
-      fi
+    # int is the boot number according to efibootmgr,
+    # i is from the configuration file (entry_i)
+    echo "$i: $label ($enabled, $exists)"
+
+    # bash can't handle booleans, so '1' (true) is stored as an integer
+    if [ $verbose -eq 1 ]; then
+      echo " "$bold"$target"$none "$unicode"
     fi
   }
 
@@ -283,10 +344,10 @@ remove_entry()
 {
   _remove_entry()
   {
-    entry
+    source_entry || return 0
 
     echo "remove: $label "
-    until ! entry_exists; do
+    while entry_exists; do
       match_entry
 
       if [ ${#int} -eq 4 ]; then
@@ -312,12 +373,12 @@ create_entry()
 
   _create_entry()
   {
-    entry
+    source_entry || return 0
 
-    if entry_exists && [ "$force" != 1 ]; then
+    if entry_exists && [ $force -ne 1 ]; then
       fatal \
-        "$label: entry already exists"\
-        $'\n'"use '--force' to ignore or '--remove' to replace it"
+        "entry '$label' already exists"\
+        "use '--force' to ignore or '--remove' to recreate"
     fi
 
     # "${part/ */}" -- get only first string
@@ -392,18 +453,15 @@ main()
       # argint makes it so everything arg provided is executed in the correct order
       # (e.g. -c -v -r becomes verbose -> remove_entry -> create_entry)
       "version"|"usage"|"list_entry"|"remove_entry"|"edit_config"|"cmdline")
-        argint=3
-        ;;
-      "create_entry")
-        argint=4
-        ;;
-      "add_cmdline"|"rm_cmdline")
         argint=2
         ;;
-      "summary")
+      "create_entry")
+        argint=3
+        ;;
+      "add_cmdline"|"rm_cmdline"|"disable"|"enable")
         argint=1
         ;;
-      "config_arg")
+      "summary")
         argint=0
         ;;
     esac
@@ -413,7 +471,7 @@ main()
     fi
 
     QUEUE[$argint]="$1"
-    unset i
+    unset argint
   }
 
   # unless log changes (provided by '-v'|'--verbose' argument),
@@ -421,16 +479,17 @@ main()
   log=/dev/null
 
   # until $@ is empty
-  while [ $# -gt 0 ]; do
+  while [ $# -ne 0 ]; do
     case "$1" in
       "--force") force=1 ;;      
       "--verbose"|"-v") verbose=1 log=/dev/stderr ;;
-      "--config") _queue "config_arg" ;;
+      "--config="*) config="${1#*=}" ;;
       "--prompt"|"-i") _queue "summary" ;;
       "--version"|"-V") _queue "version" ;;
       "--help"|"-h"|"-?") _queue "usage" ;;
       "--edit_config"|"-C") _queue "edit_config" ;;
-      "--cmdline"|"-G") _queue "get_cmdline" ;;
+      "--enable"|"-e") _queue "enable" ;;
+      "--disable"|"-d") _queue "disable" ;;
       "--add_cmdline"|"-A") _queue "add_cmdline" ;;
       "--rm_cmdline"|"-R") _queue "rm_cmdline" ;;
       "--list"|"-l") _queue "list_entry" ;;
@@ -450,8 +509,8 @@ main()
   for each in ${QUEUE[@]}; do
     case "$each" in
       # only args that require the configuration file are provided here
-      "edit_config"|"get_cmdline"|"add_cmdline"|"rm_cmdline"|"list_entry"|"remove_entry"|"create_entry")
-        if [ "$config_srcd" != 1 ]; then
+      "edit_config"|"add_cmdline"|"rm_cmdline"|"enable"|"disable"|"list_entry"|"remove_entry"|"create_entry")
+        if [ $config_srcd -ne 1 ]; then
           source /lib/stubload/config.sh
         fi
         config_srcd=1
