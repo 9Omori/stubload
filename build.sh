@@ -240,7 +240,7 @@ case "$1" in
     build_package
     ;;
   "--"*)
-    ${1/--}
+    $(sed 's/--//' <<<"$1")
     ;;
   "")
     fatal "insufficient arguments (use '--all'/'-' to build)"
