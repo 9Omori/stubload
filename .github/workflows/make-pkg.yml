@@ -1,0 +1,42 @@
+name: Package
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Clone repository
+      run: |
+        git clone https://gitlab.com/alemontn/stubload.git ~/stubload
+        chmod a+x ~/stubload/scripts/build.sh
+
+    - name: Create structure
+      run: |
+        cd ~/stubload
+        ./scripts/build.sh --structure
+
+    - name: Install dependencies
+      run: |
+        cd ~/stubload
+        ./scripts/build.sh --dependencies
+
+    - name: Setup environment
+      run: |
+        cd ~/stubload
+        ./scripts/build.sh --environment
+
+    - name: Build packages
+      run: |
+        cd ~/stubload
+        ./scripts/build.sh --build_package
+        sudo mv ./build/out ~/out
+
+    - name: Upload package as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: out
+        path: ~/out
